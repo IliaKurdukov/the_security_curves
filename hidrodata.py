@@ -30,7 +30,7 @@ if uploaded_file:
             data = pd.DataFrame(data)
             data = data.sort_values(by=values_col)
             data['Ранг'] = range(len(data))
-            data['Вероятность'] = 1 - (data['Ранг'] + 1) / (pivot_df['Ранг'].max() + 1)
+            data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 1)
 
             distributions = {'Гумбеля': 'gumbel_r', 'Фреше': 'genextreme', 'Пирсона 3 типа': 'pearson3'}
             disribution = st.selectbox("Выберите распределение для аппроксимации", distributions)
