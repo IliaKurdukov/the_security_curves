@@ -27,7 +27,7 @@ if uploaded_file:
               data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
             else:
               data = df[values_col]
-            data.sort_values(by = 'values_col', inplace=True)
+            data.sort_values(inplace=True)
             data = pd.DataFrame(data)
             data['Ранг'] = range(len(data))
             data['Вероятность'] = 1 - (data['Ранг'] + 1) / (pivot_df['Ранг'].max() + 1)
