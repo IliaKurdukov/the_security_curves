@@ -56,7 +56,7 @@ if uploaded_file:
 
             # построение кривой с распределением
             def f(x):
-                return selected_dist.ppf(1-x/100, params)
+                return selected_dist.ppf(1-x/100, *params)
             f2 = np.vectorize(f)
             x = np.arange(0.1, 99.9, 0.1)
             plt.plot(x, f2(x), color = 'red', label='Теоретическое распределение')
