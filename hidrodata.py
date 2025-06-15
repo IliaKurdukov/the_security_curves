@@ -13,7 +13,7 @@ if uploaded_file:
         #st.write(result['notes'])
         # Автоматическое определение столбцов
         numeric_cols = df.select_dtypes(include=['number']).columns
-        cols = df.colunns
+        cols = df.columns
         if len(numeric_cols) == 0:
             st.error("В файле нет числовых столбцов")
         else:
