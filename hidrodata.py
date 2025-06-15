@@ -17,7 +17,7 @@ if uploaded_file:
             st.error("В файле нет числовых столбцов")
         else:
             values_col = st.selectbox("Выберите столбец с данными для построения кривой обеспеченности", numeric_cols)
-            cols = df.columns
+            cols = df.columns.tolist()
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
             if index_col != 'Без группировки':
