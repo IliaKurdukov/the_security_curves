@@ -47,7 +47,7 @@ if uploaded_file:
             params = selected_dist.fit(data[values_col])
 
             x = data['Вероятность'] * 100
-            y = data['Высота']
+            y = data[values_col]
             plt.scatter(x, y, label='Эмпирическое распределение')
 
             # построение кривой с распределением
