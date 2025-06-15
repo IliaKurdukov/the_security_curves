@@ -27,8 +27,8 @@ if uploaded_file:
               data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
             else:
               data = df[values_col]
-            data.sort_values(inplace=True)
             data = pd.DataFrame(data)
+            data = data.sort_values(by=values_col)
             data['Ранг'] = range(len(data))
             data['Вероятность'] = 1 - (data['Ранг'] + 1) / (pivot_df['Ранг'].max() + 1)
 
@@ -44,7 +44,7 @@ if uploaded_file:
             # инициализация функции для изменения масштаба по горизонтальной оси
             def scalefunc(x):
               return stats.norm.ppf(x/100, loc=0, scale=1)
-              
+
             # График
             fig, ax = plt.subplots()
             params = selected_dist.fit(data[values_col])
