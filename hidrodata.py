@@ -38,10 +38,6 @@ if uploaded_file:
             dist_key = distributions[disribution]
             selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
 
-            # Пример вычисления PDF (функции плотности)
-            data_points = np.linspace(-3, 3, 100)
-            pdf_values = selected_dist.pdf(data_points, *params)  # params - параметры распределения
-
             # инициализация функции для изменения масштаба по горизонтальной оси
             def scalefunc(x):
               return stats.norm.ppf(x/100, loc=0, scale=1)
