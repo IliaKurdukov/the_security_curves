@@ -13,11 +13,11 @@ if uploaded_file:
         #st.write(result['notes'])
         # Автоматическое определение столбцов
         numeric_cols = df.select_dtypes(include=['number']).columns
-        cols = df.columns
         if len(numeric_cols) == 0:
             st.error("В файле нет числовых столбцов")
         else:
             values_col = st.selectbox("Выберите столбец с данными для построения кривой обеспеченности", numeric_cols)
+            cols = df.columns
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
             if index_col != 'Без группировки':
@@ -31,7 +31,7 @@ if uploaded_file:
 
             # Гистограмма
             fig, ax = plt.subplots()
-            ax.hist(df[selected_col], bins=20)
+            ax.hist(data)
             st.pyplot(fig)
 
     except Exception as e:
