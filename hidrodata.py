@@ -32,7 +32,7 @@ if uploaded_file:
             data = pd.DataFrame(data)
             data = data.sort_values(by=values_col)
             data['Ранг'] = range(len(data))
-            data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 1)
+            data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 2)
 
             distributions = {'Гумбеля': 'gumbel_r', 'Фреше': 'genextreme', 'Пирсона 3 типа': 'pearson3'}
             disribution = st.selectbox("Выберите распределение для аппроксимации", distributions)
@@ -66,7 +66,7 @@ if uploaded_file:
             plt.xscale('function', functions=[scalefunc, lambda x: x])
             ax.set(xlabel="Обеспеченность, %")
             ax.set(ylabel="Анализируемая величина")
-            ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности, \n \
+            ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности\n \
             Средняя абсолютная ошибка составляет {round(mae, 1)}")
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
@@ -78,7 +78,7 @@ if uploaded_file:
             percent_list = [1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99]
             df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
             df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
-            df=df.T
+            df.pivot_table(index='Обеспеченность', values='Значения').T
             st.table(df)
 
     except Exception as e:
