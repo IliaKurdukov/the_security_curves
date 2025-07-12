@@ -78,7 +78,7 @@ if uploaded_file:
             percent_list = [1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99]
             df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
             df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
-            df.pivot_table(index='Обеспеченность', values='Значения').T
+            df=df.pivot_table(index='Обеспеченность', values='Значения').T
             st.table(df)
 
     except Exception as e:
