@@ -3,5 +3,5 @@ pandas
 matplotlib
 numpy
 scipy
-scikit-learn==1.4.0
+scikit-learn==1.7.0
 openpyxl

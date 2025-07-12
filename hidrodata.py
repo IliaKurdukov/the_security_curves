@@ -38,6 +38,7 @@ if uploaded_file:
             disribution = st.selectbox("Выберите распределение для аппроксимации", distributions)
             dist_key = distributions[disribution]
             selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
+            params = selected_dist.fit(data[values_col])
             data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
             mae = mean_absolute_error(data[values_col], data['Предсказание'])
 
@@ -47,7 +48,6 @@ if uploaded_file:
 
             # График
             fig, ax = plt.subplots()
-            params = selected_dist.fit(data[values_col])
 
             x = data['Вероятность'] * 100
             y = data[values_col]
@@ -67,7 +67,7 @@ if uploaded_file:
             ax.set(xlabel="Обеспеченность, %")
             ax.set(ylabel="Анализируемая величина")
             ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности, \n \
-            средняя абсолютная ошибка составляет {round(mae, 1)}")
+            Средняя абсолютная ошибка составляет {round(mae, 1)}")
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
