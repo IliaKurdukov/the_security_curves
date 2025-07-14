@@ -81,7 +81,7 @@ if uploaded_file:
             df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
             df = df.set_index("Обеспеченность")
             df = df.T
-            st.markdown(df.to_html(), unsafe_allow_html=False)
+            st.markdown(df.to_html(), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
