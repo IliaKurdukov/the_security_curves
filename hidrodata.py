@@ -4,19 +4,26 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
+from streamlit.components.v1 import html
 
-# Google Analytics tracking
-st.markdown("""
+# Google Analytics тег
+ga_code = """
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX534VP5DN"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-RX534VP5DN');
 </script>
-""", unsafe_allow_html=True)
+"""
+
+# Вставка тега в приложение
+def inject_ga():
+    html(ga_code, height=0, width=0)
+
+# Инициализация GA в самом начале
+inject_ga()
 
 st.title("📊 Построение кривых обеспеченности")
 
