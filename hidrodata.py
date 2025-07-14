@@ -5,6 +5,17 @@ import numpy as np
 import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
 
+# Google Analytics tracking
+st.markdown("""
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-YOUR_TRACKING_ID"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-RX534VP5DN');
+</script>
+""", unsafe_allow_html=True)
+
 st.title("📊 Построение кривых обеспеченности")
 
 uploaded_file = st.file_uploader("Загрузите XLS файл")
