@@ -78,6 +78,15 @@ if uploaded_file:
             percent_list = [1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99]
             df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
             df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
+            # Функция для форматирования чисел
+            def custom_round(x):
+                abs_x = abs(x)
+                if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
+                    return round(x)
+                else:  # Иначе оставляем 3 значащих цифры
+                    return np.format_float_positional(x, precision=3, fractional=False, trim='-')
+            # Применяем форматирование
+            df['Значения'] = df['Значения'].apply(custom_round)
             df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
             df = df.set_index("Обеспеченность")
             df = df.T
