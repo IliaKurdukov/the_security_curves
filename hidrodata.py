@@ -79,8 +79,9 @@ if uploaded_file:
             df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
             df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
             df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
+            df = df.set_index("Обеспеченность")
             df = df.T
-            st.markdown(df.to_html(), unsafe_allow_html=True)
+            st.markdown(df.to_html(), unsafe_allow_html=False)
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
