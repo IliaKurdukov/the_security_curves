@@ -7,11 +7,13 @@ from sklearn.metrics import mean_absolute_error
 
 # Google Analytics tracking
 st.markdown("""
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-YOUR_TRACKING_ID"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RX534VP5DN"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
+
   gtag('config', 'G-RX534VP5DN');
 </script>
 """, unsafe_allow_html=True)
