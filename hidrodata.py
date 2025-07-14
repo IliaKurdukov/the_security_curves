@@ -77,8 +77,20 @@ if uploaded_file:
             # таблица
             percent_list = [1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99]
             df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
+
+            # Добавляем символ процента к значениям обеспеченности
+            df['Обеспеченность_с_процентом'] = df['Обеспеченность'].astype(str) + '%'
+
+            # Вычисляем значения
             df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
-            df=df.pivot_table(index='Обеспеченность', values='Значения').T
+
+            # Используем новый столбец с процентами для pivot
+            df = df.pivot_table(index='Обеспеченность_с_процентом', values='Значения').T
+
+            # Переименовываем индекс, чтобы добавить заголовок
+            df.index.name = 'Параметр'
+            df = df.reset_index().drop(columns=['Параметр'])
+
             st.table(df)
 
     except Exception as e:
