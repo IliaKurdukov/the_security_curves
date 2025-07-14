@@ -90,20 +90,7 @@ if uploaded_file:
             df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
             df = df.set_index("Обеспеченность")
             df = df.T
-            html = df.to_html()
-            styled_html = f"""
-            <style>
-                table {{
-                    font-size: 12px !important;
-                }}
-                th, td {{
-                    padding: 5px !important;  /* Уменьшаем отступы */
-                    text-align: center !important;  /* Выравнивание текста */
-                }}
-            </style>
-            {html}
-            """
-            st.markdown(styled_html, unsafe_allow_html=True)
+            st.dataframe(df)
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
