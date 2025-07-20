@@ -32,8 +32,8 @@ if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file)
         st.success(f"Данные успешно загружены и содержат {len(df)} строк. \n\n Ниже представлен пример данных:")
-        st.table(df.sample(5))
-        #st.write(result['notes'])
+        #st.table(df.sample(3))
+        st.markdown(df.sample(3).to_html(), unsafe_allow_html=True)
         # Автоматическое определение столбцов
         numeric_cols = df.select_dtypes(include=['number']).columns
         cols = df.columns.tolist()
@@ -59,7 +59,7 @@ if uploaded_file:
             dist_key = distributions[disribution]
             selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
             params = selected_dist.fit(data[values_col])
-            data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
+            data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
             mae = mean_absolute_error(data[values_col], data['Предсказание'])
 
             # инициализация функции для изменения масштаба по горизонтальной оси
@@ -78,14 +78,14 @@ if uploaded_file:
                 return selected_dist.ppf(1-x/100, *params)
             f2 = np.vectorize(f)
             x = np.arange(0.1, 99.9, 0.1)
-            plt.plot(x, f2(x), color = 'red', label='Теоретическое распределение')
+            plt.plot(x, f2(x), color = 'red', label= f'Распределение {disribution}')
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
             ax.xaxis.grid(True)
             plt.xscale('function', functions=[scalefunc, lambda x: x])
-            ax.set(xlabel="Обеспеченность, %")
-            ax.set(ylabel="Анализируемая величина")
+            ax.set(xlabel = "Обеспеченность, %")
+            ax.set(ylabel = values_col)
             ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности\n \
             Средняя абсолютная ошибка составляет {round(mae, 1)}")
             ax.set(xlim=(0.1,99.9))
@@ -95,7 +95,7 @@ if uploaded_file:
             st.pyplot(fig)
 
             # таблица
-            percent_list = [1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99]
+            percent_list = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
             df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
             df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
             # Функция для форматирования чисел
