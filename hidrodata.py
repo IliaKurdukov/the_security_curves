@@ -81,15 +81,15 @@ if uploaded_file:
                 return selected_dist.ppf(1-x/100, *params)
             f2 = np.vectorize(f)
             x = np.arange(0.1, 99.9, 0.1)
-            plt.plot(x, f2(x), color = 'red', label= f'Распределение {disribution}')
+            teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
+            plt.plot(x, f2(x), color = 'red', label= f'Распределение {teor_label}')
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
             ax.xaxis.grid(True)
             plt.xscale('function', functions=[scalefunc, lambda x: x])
             ax.set(xlabel = "Обеспеченность, %")
-            ylabel = re.sub(r'\s*\([^)]*\)$', '', values_col)
-            ax.set(ylabel = ylabel)
+            ax.set(ylabel = values_col)
             ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности\n \
             Средняя абсолютная ошибка составляет {round(mae, 1)}")
             ax.set(xlim=(0.1,99.9))
