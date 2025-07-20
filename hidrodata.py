@@ -54,7 +54,9 @@ if uploaded_file:
             data['Ранг'] = range(len(data))
             data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 2)
 
-            distributions = {'Гумбеля': 'gumbel_r', 'Фреше': 'genextreme', 'Пирсона 3 типа': 'pearson3'}
+            distributions = {'Гумбеля (метод максимального правдоподобия)': 'gumbel_r',
+                             'Фреше (метод максимального правдоподобия)': 'genextreme',
+                             'Пирсона 3 типа (метод максимального правдоподобия)': 'pearson3'}
             disribution = st.selectbox("Выберите распределение для аппроксимации", distributions)
             dist_key = distributions[disribution]
             selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
