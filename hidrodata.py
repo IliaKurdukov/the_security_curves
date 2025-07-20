@@ -98,7 +98,7 @@ if uploaded_file:
             plt.legend()
             st.pyplot(fig)
 
-            with st.expander("## 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
+            with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
 
               # таблица
               percent_list = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
@@ -114,7 +114,7 @@ if uploaded_file:
               # Применяем форматирование
               df['Значения'] = df['Значения'].apply(custom_round)
               #df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
-              df = df.set_index("Обеспеченность")
+              #df = df.set_index("Обеспеченность")
               df = df.T
               #st.dataframe(df)
               st.markdown(df.to_html(index=False), unsafe_allow_html=True)
@@ -125,7 +125,7 @@ if uploaded_file:
                     "Выберите обеспеченность для расчета значения",
                     min_value= 0.001,
                     max_value= 99.999,
-                    value= 50,
+                    value= 50.0,
                     step= 0.001
                 )
               value = selected_dist.ppf(1-p/100, *params)
