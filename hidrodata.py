@@ -101,7 +101,7 @@ if uploaded_file:
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
 
               # таблица
-              percent_list = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
+              percent_list = [0.01, 0.1, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
               df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
               df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
               # Функция для форматирования чисел
@@ -117,16 +117,16 @@ if uploaded_file:
               #df = df.set_index("Обеспеченность")
               df = df.T
               #st.dataframe(df)
-              st.markdown(df.to_html(index=False), unsafe_allow_html=True)
+              st.markdown(df.to_html(index=False, header=False), unsafe_allow_html=True)
               #st.table(df)
 
               # бегунок
               p = st.slider(
                     "Выберите обеспеченность для расчета значения",
-                    min_value= 0.001,
-                    max_value= 99.999,
+                    min_value= 0.01,
+                    max_value= 99.99,
                     value= 50.0,
-                    step= 0.001
+                    step= 0.01
                 )
               value = selected_dist.ppf(1-p/100, *params)
               st.markdown(f'При обеспеченности {p}% {values_col} составляет {custom_round(value)}.')
