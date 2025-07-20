@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import re
 import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
 from streamlit.components.v1 import html
@@ -87,7 +88,8 @@ if uploaded_file:
             ax.xaxis.grid(True)
             plt.xscale('function', functions=[scalefunc, lambda x: x])
             ax.set(xlabel = "Обеспеченность, %")
-            ax.set(ylabel = values_col)
+            ylabel = re.sub(r'\s*\([^)]*\)$', '', values_col)
+            ax.set(ylabel = ylabel)
             ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности\n \
             Средняя абсолютная ошибка составляет {round(mae, 1)}")
             ax.set(xlim=(0.1,99.9))
