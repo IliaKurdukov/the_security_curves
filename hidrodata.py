@@ -123,10 +123,10 @@ if uploaded_file:
               # бегунок
               p = st.slider(
                     "Выберите обеспеченность для расчета значения",
-                    min_value= 0,001,
-                    max_value= 99,999,
+                    min_value= 0.001,
+                    max_value= 99.999,
                     value= 50,
-                    step= 0,001
+                    step= 0.001
                 )
               value = selected_dist.ppf(1-p/100, *params)
               st.markdown(f'При обеспеченности {p}% {values_col} составляет {custom_round(value)}.')
