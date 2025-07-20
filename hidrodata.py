@@ -98,25 +98,38 @@ if uploaded_file:
             plt.legend()
             st.pyplot(fig)
 
-            # таблица
-            percent_list = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
-            df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
-            df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
-            # Функция для форматирования чисел
-            def custom_round(x):
-                abs_x = abs(x)
-                if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
-                    return round(x)
-                else:  # Иначе оставляем 3 значащих цифры
-                    return np.format_float_positional(x, precision=3, fractional=False, trim='-')
-            # Применяем форматирование
-            df['Значения'] = df['Значения'].apply(custom_round)
-            df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
-            df = df.set_index("Обеспеченность")
-            df = df.T
-            #st.dataframe(df)
-            st.markdown(df.to_html(), unsafe_allow_html=True)
-            #st.table(df)
+            with st.expander("## 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
+
+              # таблица
+              percent_list = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
+              df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
+              df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
+              # Функция для форматирования чисел
+              def custom_round(x):
+                  abs_x = abs(x)
+                  if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
+                      return round(x)
+                  else:  # Иначе оставляем 3 значащих цифры
+                      return np.format_float_positional(x, precision=3, fractional=False, trim='-')
+              # Применяем форматирование
+              df['Значения'] = df['Значения'].apply(custom_round)
+              #df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
+              df = df.set_index("Обеспеченность")
+              df = df.T
+              #st.dataframe(df)
+              st.markdown(df.to_html(index=False), unsafe_allow_html=True)
+              #st.table(df)
+
+              # бегунок
+              p = st.slider(
+                    "Выберите обеспеченность для расчета значения",
+                    min_value= 0,001,
+                    max_value= 99,999,
+                    value= 50,
+                    step= 0,001
+                )
+              value = selected_dist.ppf(1-p/100, *params)
+              st.markdown(f'При обеспеченности {p}% {values_col} составляет {custom_round(value)}.')
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
