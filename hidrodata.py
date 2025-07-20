@@ -123,10 +123,10 @@ if uploaded_file:
               # бегунок
               p = st.number_input(
               "Выберите обеспеченность для расчета значения (0 < P < 100)",
-              min_value=0.01,
-              max_value=99.99,
+              min_value=0.001,
+              max_value=99.999,
               value=50.0,
-              step=0.01,
+              #step=0.01,
               #format="%.2f",  # Формат с двумя знаками после запятой
 )
               value = selected_dist.ppf(1-p/100, *params)
