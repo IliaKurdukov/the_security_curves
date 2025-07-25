@@ -61,7 +61,7 @@ if uploaded_file:
 
             x = data['Вероятность'] * 100
             y = data[values_col]
-            plt.scatter(x, y, , color = '#003f5c', label='Эмпирическое распределение')
+            plt.scatter(x, y, color = '#003f5c', label='Эмпирическое распределение')
 
             # построение кривой с распределением
             for distribution in disributions_to_plot:
