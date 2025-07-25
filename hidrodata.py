@@ -7,17 +7,19 @@ import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
 from streamlit.components.v1 import html
 
-st.set_page_config(
-    head="""
+st.write("Версия Streamlit:", st.__version__)
+
+st.markdown("""
     <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX534VP5DN"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-RX534VP5DN');
+      gtag('config', 'G-XXXXXXXXXX');
     </script>
-    """
+    """, 
+    unsafe_allow_html=True
 )
 
 # Google Analytics тег
