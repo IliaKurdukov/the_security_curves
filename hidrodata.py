@@ -42,7 +42,8 @@ if uploaded_file:
             # disribution = st.selectbox("Выберите распределение для аппроксимации", distributions)
             distributions_to_plot = st.multiselect(
                   'Выберите распределение для аппроксимации',
-                  distributions
+                  distributions,
+                  default = default=[distributions[-1]]
                   )
 
             # инициализация функции для изменения масштаба по горизонтальной оси
@@ -54,7 +55,12 @@ if uploaded_file:
 
             x = data['Вероятность'] * 100
             y = data[values_col]
-            plt.scatter(x, y, label='Эмпирическое распределение')
+            plt.scatter(x, y,
+                        label='Эмпирическое распределение',
+                        s=20,           # размер точек (можно подобрать нужное значение)
+                        facecolors='none', # без заливки
+                        edgecolors='black', # черный контур
+                        linewidths=1)    # толщина контура
 
             # построение кривой с распределением
             for disribution in distributions_to_plot:
