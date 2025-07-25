@@ -16,14 +16,14 @@ components.html("""
 function loadGA() {
   var gaScript1 = document.createElement('script');
   gaScript1.async = true;
-  gaScript1.src = 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX';
+  gaScript1.src = 'https://www.googletagmanager.com/gtag/js?id=G-RX534VP5DN';
   
   var gaScript2 = document.createElement('script');
   gaScript2.innerHTML = `
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'G-XXXXXXXXXX');
+    gtag('config', 'G-RX534VP5DN');
   `;
   
   document.head.appendChild(gaScript1);
