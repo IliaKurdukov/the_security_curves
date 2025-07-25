@@ -1,3 +1,6 @@
+from inject_ga import _customize_index_html
+_customize_index_html()
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
