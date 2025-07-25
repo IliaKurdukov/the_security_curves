@@ -39,12 +39,18 @@ if uploaded_file:
                              'Фреше (метод максимального правдоподобия)': 'invweibull',
                              'Пирсона 3 типа (метод максимального правдоподобия)': 'pearson3',
                              'Обобщенное (метод максимального правдоподобия)': 'genextreme'}
-            disribution = st.selectbox("Выберите распределение для аппроксимации", distributions)
-            dist_key = distributions[disribution]
-            selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
+            #disribution_to_plot = st.selectbox("Выберите распределение для аппроксимации", distributions)
+            disributions_to_plot = st.multiselect(
+                  'Выберите распределения для аппроксимации',
+                  distributions,
+                  default=[distributions[-1]]
+                  )
+
+            dist_value = distributions[disribution]
+            selected_dist = getattr(stats, dist_value)  # Получаем класс распределения
             params = selected_dist.fit(data[values_col])
-            data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-            mae = mean_absolute_error(data[values_col], data['Предсказание'])
+            # data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
+            # mae = mean_absolute_error(data[values_col], data['Предсказание'])
 
             # инициализация функции для изменения масштаба по горизонтальной оси
             def scalefunc(x):
@@ -55,15 +61,21 @@ if uploaded_file:
 
             x = data['Вероятность'] * 100
             y = data[values_col]
-            plt.scatter(x, y, label='Эмпирическое распределение')
+            plt.scatter(x, y, , color = '#003f5c', label='Эмпирическое распределение')
 
             # построение кривой с распределением
-            def f(x):
-                return selected_dist.ppf(1-x/100, *params)
-            f2 = np.vectorize(f)
-            x = np.arange(0.1, 99.9, 0.1)
-            teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-            plt.plot(x, f2(x), color = 'red', label= f'Распределение {teor_label}')
+            for distribution in disributions_to_plot:
+              dist_value = distributions[disribution]
+              selected_dist = getattr(stats, dist_value)  # Получаем класс распределения
+              params = selected_dist.fit(data[values_col])
+              # data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
+              # mae = mean_absolute_error(data[values_col], data['Предсказание'])              
+              def f(x):
+                  return selected_dist.ppf(1-x/100, *params)
+              f2 = np.vectorize(f)
+              x = np.arange(0.1, 99.9, 0.1)
+              teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
+              plt.plot(x, f2(x), label= f'Распределение {teor_label}')
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
