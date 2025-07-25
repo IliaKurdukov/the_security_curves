@@ -5,39 +5,6 @@ import numpy as np
 import re
 import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
-from streamlit.components.v1 import html
-
-import streamlit.components.v1 as components
-
-# Вставьте в самое начало app.py
-components.html("""
-<script>
-// Динамическое создание тега в <head>
-function loadGA() {
-  var gaScript1 = document.createElement('script');
-  gaScript1.async = true;
-  gaScript1.src = 'https://www.googletagmanager.com/gtag/js?id=G-RX534VP5DN';
-  
-  var gaScript2 = document.createElement('script');
-  gaScript2.innerHTML = `
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-RX534VP5DN');
-  `;
-  
-  document.head.appendChild(gaScript1);
-  document.head.appendChild(gaScript2);
-}
-
-// Запуск после полной загрузки страницы
-if (window.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', loadGA);
-} else {
-  loadGA();
-}
-</script>
-""", height=0)  # height=0 скрывает компонент
 
 st.title("📉 Кривые обеспеченности")
 
