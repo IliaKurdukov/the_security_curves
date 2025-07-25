@@ -1,6 +1,3 @@
-from inject_ga import _customize_index_html
-_customize_index_html()
-
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,6 +6,19 @@ import re
 import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
 from streamlit.components.v1 import html
+
+st.set_page_config(
+    head="""
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-RX534VP5DN"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-RX534VP5DN');
+    </script>
+    """
+)
 
 # Google Analytics тег
 ga_code = """
