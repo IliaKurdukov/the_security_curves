@@ -43,7 +43,7 @@ if uploaded_file:
             distributions_to_plot = st.multiselect(
                   'Выберите распределение для аппроксимации',
                   distributions,
-                  default = default=[distributions[-1]]
+                  default = [distributions[-1]]
                   )
 
             # инициализация функции для изменения масштаба по горизонтальной оси
