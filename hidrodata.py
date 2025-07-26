@@ -116,8 +116,8 @@ if uploaded_file:
             st.pyplot(fig)
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
-              df_1 = df.T
-              df_2 = df.T
+              df_1 = df_1.T
+              df_2 = df_1.T
               st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
               st.markdown(df_2.to_html(index=True, header=False), unsafe_allow_html=True)
 
@@ -126,7 +126,7 @@ if uploaded_file:
               "Выберите обеспеченность для расчета значения (0 < P < 100)",
               min_value=0.001,
               max_value=99.999,
-              value=0,
+              value=0.0,
               #step=0.01,
               #format="%.2f",  # Формат с двумя знаками после запятой
               )
