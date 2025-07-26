@@ -20,6 +20,7 @@ if uploaded_file:
         cols = df.columns.tolist()
         if len(numeric_cols) == 0:
             st.error("В файле нет числовых столбцов")
+            st.stop()
         else:
             values_col = st.selectbox("Выберите столбец с данными для построения кривой обеспеченности", numeric_cols)
             cols.insert(0, 'Без группировки')
@@ -39,7 +40,7 @@ if uploaded_file:
                              'Фреше (метод максимального правдоподобия)': 'invweibull',
                              'Пирсона 3 типа (метод максимального правдоподобия)': 'pearson3',
                              'Обобщенное (метод максимального правдоподобия)': 'genextreme'}
-            # disribution = st.selectbox("Выберите распределение для аппроксимации", distributions)
+            
             distributions_to_plot = st.multiselect(
                   'Выберите распределение для аппроксимации',
                   distributions,
@@ -50,7 +51,7 @@ if uploaded_file:
             def scalefunc(x):
               return stats.norm.ppf(x/100, loc=0, scale=1)
 
-            # График
+            # График, таблица
             fig, ax = plt.subplots()
 
             x = data['Вероятность'] * 100
@@ -61,6 +62,17 @@ if uploaded_file:
                         facecolors='none', # без заливки
                         edgecolors='black', # черный контур
                         linewidths=1)    # толщина контура
+            
+            # таблица
+            percent_list = [0.01, 0.1, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
+            df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
+            # Функция для форматирования чисел в таблице
+            def custom_round(x):
+              abs_x = abs(x)
+              if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
+                return round(x)
+              else:  # Иначе оставляем 3 значащих цифры
+                return np.format_float_positional(x, precision=3, fractional=False, trim='-')
 
             # построение кривой с распределением
             for disribution in distributions_to_plot:
@@ -71,11 +83,16 @@ if uploaded_file:
               mae = mean_absolute_error(data[values_col], data['Предсказание'])
 
               def f(x):
-                  return selected_dist.ppf(1-x/100, *params)
+                return selected_dist.ppf(1-x/100, *params)
               f2 = np.vectorize(f)
               x = np.arange(0.1, 99.9, 0.1)
               teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
               plt.plot(x, f2(x), label= f'Распределение {teor_label} ({round(mae, 1)})')
+
+              #сбор данных в таблицу
+              df[f'Распределение {teor_label}'] = df['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
+              # Применяем форматирование
+              # df[f'Распределение {teor_label}'] = df[f'Распределение {teor_label}'].apply(custom_round)
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
@@ -92,25 +109,11 @@ if uploaded_file:
             st.pyplot(fig)
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
-
-              # таблица
-              percent_list = [0.01, 0.1, 0.5, 1, 2, 3, 5, 10, 50, 90, 95, 98, 99]
-              df = pd.DataFrame(percent_list, columns=['Обеспеченность'])
-              df['Значения'] = df['Обеспеченность'].apply(lambda x: selected_dist.ppf(1-x/100, *params))
-              # Функция для форматирования чисел
-              def custom_round(x):
-                  abs_x = abs(x)
-                  if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
-                      return round(x)
-                  else:  # Иначе оставляем 3 значащих цифры
-                      return np.format_float_positional(x, precision=3, fractional=False, trim='-')
-              # Применяем форматирование
-              df['Значения'] = df['Значения'].apply(custom_round)
               #df['Обеспеченность'] = df['Обеспеченность'].astype(str) + '%'
               #df = df.set_index("Обеспеченность")
               df = df.T
               #st.dataframe(df)
-              st.markdown(df.to_html(index=False, header=False), unsafe_allow_html=True)
+              st.markdown(df.to_html(index=True, header=False), unsafe_allow_html=True)
               #st.table(df)
 
               # бегунок
@@ -121,7 +124,7 @@ if uploaded_file:
               value=50.0,
               #step=0.01,
               #format="%.2f",  # Формат с двумя знаками после запятой
-)
+              )
               value = selected_dist.ppf(1-p/100, *params)
               st.markdown(f'При обеспеченности {p}% {values_col} составляет {custom_round(value)}.')
 
