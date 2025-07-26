@@ -18,6 +18,7 @@
 📂 **Структура проекта**
 the_security_curves/  
 ├── hidrodata.py                             # Основной скрипт Streamlit  
+├── LICENSE                                  # Лицензия
 ├── requirements.txt                         # Зависимости  
 ├── README.md                                # Этот файл  
 
