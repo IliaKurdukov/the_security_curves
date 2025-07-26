@@ -70,7 +70,7 @@ if uploaded_file:
                         linewidths=1)    # толщина контура
             
             # таблица
-            percent_list_1 = [0.01, 0.1, 0,33, 0.5, 1, 2, 3, 5]
+            percent_list_1 = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5]
             percent_list_2 = [10, 50, 63, 90, 95, 98, 99, 99.9]
             df_1 = pd.DataFrame(percent_list_1, columns=['Обеспеченность'])
             df_2 = pd.DataFrame(percent_list_2, columns=['Обеспеченность'])
@@ -87,8 +87,9 @@ if uploaded_file:
               dist_key = distributions[disribution]
               selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
               params = selected_dist.fit(data[values_col])
-              data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-              mae = mean_absolute_error(data[values_col], data['Предсказание'])
+              #data['Предсказание'] = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
+              #mae = mean_absolute_error(data[values_col], data['Предсказание'])
+              mae=1
 
               def f(x):
                 return selected_dist.ppf(1-x/100, *params)
@@ -117,7 +118,7 @@ if uploaded_file:
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
               df_1 = df_1.T
-              df_2 = df_1.T
+              df_2 = df_2.T
               st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
               st.markdown(df_2.to_html(index=True, header=False), unsafe_allow_html=True)
 
