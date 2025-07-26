@@ -19,7 +19,7 @@ if uploaded_file:
               return "строки"  # 2, 3, 4 строки (но 12, 13, 14 — "строк")
           else:
               return "строк"  # 0, 5-20, 25-30 и т.д.
-        st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows{len(df)}}. Ниже представлен пример данных:")
+        st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}. Ниже представлен пример данных:")
         st.markdown(df.head(3).to_html(), unsafe_allow_html=True)
         # Автоматическое определение столбцов
         numeric_cols = df.select_dtypes(include=['number']).columns
