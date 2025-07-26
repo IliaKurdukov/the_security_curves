@@ -98,8 +98,8 @@ if uploaded_file:
               plt.plot(x, f2(x), label= f'Распределение {teor_label} ({round(mae, 1)})')
 
               #сбор данных в таблицу
-              df_1[f'Распределение {teor_label}'] = df['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
-              df_2[f'Распределение {teor_label}'] = df['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
+              df_1[f'Распределение {teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
+              df_2[f'Распределение {teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
@@ -139,8 +139,8 @@ if uploaded_file:
                   value = selected_dist.ppf(1-p/100, *params)
                   teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
                   custom_dict[teor_label] = value
-                df = pd.DataFrame(list(custom_dict.items()))
-                st.markdown(df.to_html(index=False, header=False), unsafe_allow_html=True)
+                custom_df = pd.DataFrame(list(custom_dict.items()))
+                st.markdown(custom_df.to_html(index=False, header=False), unsafe_allow_html=True)
                 #st.markdown(f'При обеспеченности {p}% {values_col} составляет {custom_round(value)}.')
 
     except Exception as e:
