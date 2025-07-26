@@ -88,7 +88,7 @@ if uploaded_file:
               selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
               params = selected_dist.fit(data[values_col])
               predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-              mae = mean_absolute_error(data[values_col], data['Предсказание'])
+              mae = mean_absolute_error(data[values_col], predict)
 
               def f(x):
                 return selected_dist.ppf(1-x/100, *params)
@@ -140,7 +140,8 @@ if uploaded_file:
                 custom_dict[teor_label] = value
               series = pd.Series(custom_dict, name='Values')
               series.index.name = 'Keys'
-              st.markdown(series.to_html(index=True, header=False), unsafe_allow_html=True)
+              custom_df = pd.DataFrame(series)
+              st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
               #st.markdown(f'При обеспеченности {p}% {values_col} составляет {custom_round(value)}.')
 
     except Exception as e:
