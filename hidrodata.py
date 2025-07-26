@@ -21,6 +21,7 @@ if uploaded_file:
               return "строк"  # 0, 5-20, 25-30 и т.д.
         st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}. Ниже представлен пример данных:")
         st.markdown(df.head(3).to_html(), unsafe_allow_html=True)
+        
         # Автоматическое определение столбцов
         numeric_cols = df.select_dtypes(include=['number']).columns
         cols = df.columns.tolist()
@@ -64,7 +65,7 @@ if uploaded_file:
             y = data[values_col]
             plt.scatter(x, y,
                         label='Эмпирическое распределение',
-                        s=20,           # размер точек (можно подобрать нужное значение)
+                        s=20,           # размер точек 
                         facecolors='none', # без заливки
                         edgecolors='black', # черный контур
                         linewidths=1)    # толщина контура
@@ -74,6 +75,7 @@ if uploaded_file:
             percent_list_2 = [10, 50, 63, 90, 95, 98, 99, 99.9]
             df_1 = pd.DataFrame(percent_list_1, columns=['Обеспеченность'])
             df_2 = pd.DataFrame(percent_list_2, columns=['Обеспеченность'])
+
             # Функция для форматирования чисел в таблице
             def custom_round(x):
               abs_x = abs(x)
@@ -85,7 +87,7 @@ if uploaded_file:
             # построение кривой с распределением
             for disribution in distributions_to_plot:
               dist_key = distributions[disribution]
-              selected_dist = getattr(stats, dist_key)  # Получаем класс распределения
+              selected_dist = getattr(stats, dist_key)
               params = selected_dist.fit(data[values_col])
               predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
               mae = mean_absolute_error(data[values_col], predict)
@@ -125,10 +127,7 @@ if uploaded_file:
               p = st.number_input(
               "Выберите обеспеченность для расчета значения (0 < P < 100)",
               min_value=0.01,
-              max_value=99.999,
-              #value=0.0,
-              #step=0.01,
-              #format="%.2f",  # Формат с двумя знаками после запятой
+              max_value=99.999
               )
               custom_dict = {}
               for disribution in distributions_to_plot:
@@ -138,11 +137,8 @@ if uploaded_file:
                 value = selected_dist.ppf(1-p/100, *params)
                 teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
                 custom_dict[teor_label] = value
-              series = pd.Series(custom_dict, name='Values')
-              series.index.name = 'Keys'
-              custom_df = pd.DataFrame(series)
+              custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
               st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
-              #st.markdown(f'При обеспеченности {p}% {values_col} составляет {custom_round(value)}.')
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
