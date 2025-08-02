@@ -8,7 +8,7 @@ import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
 
 st.title("📉 Кривые обеспеченности")
-with streamlit_analytics.track():
+with streamlit_analytics.track(use_local_storage=True):
   uploaded_file = st.file_uploader("Загрузите XLS файл")
   if uploaded_file:
       try:
