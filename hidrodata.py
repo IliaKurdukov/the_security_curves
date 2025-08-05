@@ -7,7 +7,6 @@ import scipy.stats as stats
 from sklearn.metrics import mean_absolute_error
 
 st.title("📉 Кривые обеспеченности")
-
 uploaded_file = st.file_uploader("Загрузите XLS файл")
 if uploaded_file:
     try:
@@ -21,7 +20,7 @@ if uploaded_file:
               return "строк"  # 0, 5-20, 25-30 и т.д.
         st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}. Ниже представлен пример данных:")
         st.markdown(df.head(3).to_html(), unsafe_allow_html=True)
-        
+
         # Автоматическое определение столбцов
         numeric_cols = df.select_dtypes(include=['number']).columns
         cols = df.columns.tolist()
@@ -44,15 +43,15 @@ if uploaded_file:
             data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 2)
 
             distributions = {'Гумбеля (метод максимального правдоподобия)': 'gumbel_r',
-                             'Фреше (метод максимального правдоподобия)': 'invweibull',
-                             'Пирсона 3 типа (метод максимального правдоподобия)': 'pearson3',
-                             'Обобщенное (метод максимального правдоподобия)': 'genextreme'}
-            
+                            'Фреше (метод максимального правдоподобия)': 'invweibull',
+                            'Пирсона 3 типа (метод максимального правдоподобия)': 'pearson3',
+                            'Обобщенное (метод максимального правдоподобия)': 'genextreme'}
+
             distributions_to_plot = st.multiselect(
-                  'Выберите распределение для аппроксимации',
-                  distributions,
-                  default = [list(distributions)[-1]]
-                  )
+                'Выберите распределение для аппроксимации',
+                distributions,
+                default = [list(distributions)[-1]]
+                )
 
             # инициализация функции для изменения масштаба по горизонтальной оси
             def scalefunc(x):
@@ -65,16 +64,25 @@ if uploaded_file:
             y = data[values_col]
             plt.scatter(x, y,
                         label='Эмпирическое распределение',
-                        s=20,           # размер точек 
+                        s=20,           # размер точек
                         facecolors='none', # без заливки
                         edgecolors='black', # черный контур
                         linewidths=1)    # толщина контура
-            
-            # таблица
+
+            # таблица значений с разной обеспеченностью
             percent_list_1 = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5]
             percent_list_2 = [10, 50, 63, 90, 95, 98, 99, 99.9]
             df_1 = pd.DataFrame(percent_list_1, columns=['Обеспеченность'])
             df_2 = pd.DataFrame(percent_list_2, columns=['Обеспеченность'])
+
+            # таблица характеристик
+            parameters = ['Среднее', 'Cv', 'Cs']
+            parameters_df = pd.DataFrame(parameters, columns=['Распределение'])
+            mean = data.mean()
+            std = data.std()
+            cv = std/mean
+            cs = stats.skew(data)
+            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs])
 
             # Функция для форматирования чисел в таблице
             def custom_round(x):
@@ -99,9 +107,24 @@ if uploaded_file:
               teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
               plt.plot(x, f2(x), label= f'Распределение {teor_label} ({round(mae, 1)})')
 
-              #сбор данных в таблицу
+              # сбор данных в таблицу c обеспеченностями
               df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
               df_2[f'{teor_label}'] = df_2['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
+
+              # сбор данных в таблицу с параметрами распределения
+              def format_stat(value):
+                """Форматирует статистику: заменяет nan/inf на 'Не существует'."""
+                if np.isnan(value) or np.isinf(value):
+                    return "Не существует"
+                else:
+                  return value
+
+              dist = selected_dist(*params)
+              mean = dist.mean()
+              std = dist.std()
+              cv = format_stat(std/mean)
+              cs = format_stat(dist.stats(moments='s'))
+              parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs])
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
@@ -117,7 +140,7 @@ if uploaded_file:
             plt.legend()
             st.pyplot(fig)
 
-            with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=True):
+            with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
               df_1 = df_1.T
               df_2 = df_2.T
               st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
@@ -126,7 +149,7 @@ if uploaded_file:
               # ввод значений
               p = st.number_input(
               "Выберите обеспеченность для расчета значения (0 < P < 100)",
-              min_value=0.01,
+              min_value=0.001,
               max_value=99.999
               )
               custom_dict = {}
@@ -134,11 +157,14 @@ if uploaded_file:
                 dist_key = distributions[disribution]
                 selected_dist = getattr(stats, dist_key)
                 params = selected_dist.fit(data[values_col])
-                value = selected_dist.ppf(1-p/100, *params)
                 teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-                custom_dict[teor_label] = value
+                custom_dict[teor_label] = custom_round(selected_dist.ppf(1-p/100, *params))
               custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
               st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
+            
+            with st.expander("# 📋 Параметры полученных распределений", expanded=False):
+              parameters_df = parameters_df.T
+              st.markdown(parameters_df.to_html(index=True, header=False), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
