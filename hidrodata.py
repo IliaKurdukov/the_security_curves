@@ -78,10 +78,10 @@ if uploaded_file:
             # таблица характеристик
             parameters = ['Среднее', 'Cv', 'Cs']
             parameters_df = pd.DataFrame(parameters, columns=['Распределение'])
-            mean = data.mean()
-            std = data.std()
+            mean = data[values_col].mean()
+            std = data[values_col].std()
             cv = std/mean
-            cs = stats.skew(data)
+            cs = stats.skew(data[values_col])
             parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs])
 
             # Функция для форматирования чисел в таблице
