@@ -138,14 +138,16 @@ if uploaded_file:
             # границ, шага и подписей делений для горизонтальной оси
             ax.xaxis.grid(True)
             plt.xscale('function', functions=[scalefunc, lambda x: x])
-            ax.set(xlabel = "Обеспеченность, %")
-            ax.set(ylabel = values_col)
-            
-            ax.set_title(f"Значения с разной долей обеспеченности", fontsize=6)
+            ax.set_xlabel("Обеспеченность, %", fontsize=6)
+            ax.set_ylabel(values_col, fontsize=6)       
+            ax.set_title(f"Значения с разной долей обеспеченности", fontsize=8)
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             plt.legend()
+            ax.tick_params(axis='x', labelsize=6)
+            ax.tick_params(axis='y', labelsize=6)
+            legend = ax.legend(fontsize=6)
             st.pyplot(fig, use_container_width=False)
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
