@@ -170,7 +170,7 @@ if uploaded_file:
               custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
               st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
             
-            with st.expander("# 📋 Параметры полученных распределений", expanded=False):
+            with st.expander("# 📋 Параметры и метрики качества полученных распределений", expanded=False):
               parameters_df = parameters_df.T
               st.markdown(parameters_df.to_html(index=True, header=False), unsafe_allow_html=True)
 
