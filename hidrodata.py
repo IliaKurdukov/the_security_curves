@@ -74,7 +74,7 @@ if uploaded_file:
             y = data[values_col]
             plt.scatter(x, y,
                         label='Эмпирическое распределение',
-                        s=10,           # размер точек
+                        s=5,           # размер точек
                         facecolors='none', # без заливки
                         edgecolors='black', # черный контур
                         linewidths=0.5)    # толщина контура
@@ -114,7 +114,7 @@ if uploaded_file:
               f2 = np.vectorize(f)
               x = np.arange(0.1, 99.9, 0.1)
               teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-              plt.plot(x, f2(x), label= f'Распределение {teor_label}', linewidth=0.5)
+              plt.plot(x, f2(x), label= f'Распределение {teor_label}', linewidth=0.7)
 
               # сбор данных в таблицу c обеспеченностями
               df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
