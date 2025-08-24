@@ -68,7 +68,7 @@ if uploaded_file:
               return stats.norm.ppf(x/100, loc=0, scale=1)
 
             # График, таблица
-            fig, ax = plt.subplots(figsize=(10, 5))
+            fig, ax = plt.subplots(figsize=(2, 1))
 
             x = data['Вероятность'] * 100
             y = data[values_col]
