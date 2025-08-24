@@ -68,7 +68,7 @@ if uploaded_file:
               return stats.norm.ppf(x/100, loc=0, scale=1)
 
             # График, таблица
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(10, 5))
 
             x = data['Вероятность'] * 100
             y = data[values_col]
@@ -80,10 +80,8 @@ if uploaded_file:
                         linewidths=1)    # толщина контура
 
             # таблица значений с разной обеспеченностью
-            percent_list_1 = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5]
-            percent_list_2 = [10, 50, 63, 90, 95, 98, 99, 99.9]
+            percent_list_1 = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 63, 90, 95, 98, 99, 99.9]
             df_1 = pd.DataFrame(percent_list_1, columns=['Обеспеченность'])
-            df_2 = pd.DataFrame(percent_list_2, columns=['Обеспеченность'])
 
             # таблица характеристик
             parameters = ['Среднее', 'Cv', 'Cs', 'R²', 'MAE']
@@ -120,7 +118,6 @@ if uploaded_file:
 
               # сбор данных в таблицу c обеспеченностями
               df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
-              df_2[f'{teor_label}'] = df_2['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
 
               # сбор данных в таблицу с параметрами распределения
               def format_stat(value):
@@ -143,7 +140,7 @@ if uploaded_file:
             plt.xscale('function', functions=[scalefunc, lambda x: x])
             ax.set(xlabel = "Обеспеченность, %")
             ax.set(ylabel = values_col)
-            ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности")
+            ax.set(title= f"Значения с разной долей обеспеченности")
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
@@ -152,9 +149,7 @@ if uploaded_file:
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
               df_1 = df_1.T
-              df_2 = df_2.T
               st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
-              st.markdown(df_2.to_html(index=True, header=False), unsafe_allow_html=True)
 
               # ввод значений
               p = st.number_input(
