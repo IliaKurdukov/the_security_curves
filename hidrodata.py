@@ -74,10 +74,10 @@ if uploaded_file:
             y = data[values_col]
             plt.scatter(x, y,
                         label='Эмпирическое распределение',
-                        s=20,           # размер точек
+                        s=10,           # размер точек
                         facecolors='none', # без заливки
                         edgecolors='black', # черный контур
-                        linewidths=1)    # толщина контура
+                        linewidths=0.5)    # толщина контура
 
             # таблица значений с разной обеспеченностью
             percent_list_1 = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 63, 90, 95, 98, 99, 99.9]
@@ -114,7 +114,7 @@ if uploaded_file:
               f2 = np.vectorize(f)
               x = np.arange(0.1, 99.9, 0.1)
               teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-              plt.plot(x, f2(x), label= f'Распределение {teor_label}')
+              plt.plot(x, f2(x), label= f'Распределение {teor_label}', linewidth=0.5)
 
               # сбор данных в таблицу c обеспеченностями
               df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
