@@ -4,7 +4,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import re
 import scipy.stats as stats
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, r2_score
+
+st.set_page_config(
+    page_title="Кривые обеспеченности",
+    page_icon="📉",
+    layout="wide",
+    menu_items={
+        'About': "Приложение для анализа экстремальных событий"
+    }
+)
 
 st.title("📉 Кривые обеспеченности")
 uploaded_file = st.file_uploader("Загрузите XLS файл")
@@ -18,8 +27,9 @@ if uploaded_file:
               return "строки"  # 2, 3, 4 строки (но 12, 13, 14 — "строк")
           else:
               return "строк"  # 0, 5-20, 25-30 и т.д.
-        st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}. Ниже представлен пример данных:")
-        st.markdown(df.head(3).to_html(), unsafe_allow_html=True)
+        st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}")
+        with st.expander("# 🔢 Фрагмент загруженных данных", expanded=False):
+            st.markdown(df.head().to_html(), unsafe_allow_html=True)
 
         # Автоматическое определение столбцов
         numeric_cols = df.select_dtypes(include=['number']).columns
@@ -76,13 +86,13 @@ if uploaded_file:
             df_2 = pd.DataFrame(percent_list_2, columns=['Обеспеченность'])
 
             # таблица характеристик
-            parameters = ['Среднее', 'Cv', 'Cs']
+            parameters = ['Среднее', 'Cv', 'Cs', 'R²', 'MAE']
             parameters_df = pd.DataFrame(parameters, columns=['Распределение'])
             mean = data[values_col].mean()
             std = data[values_col].std()
             cv = std/mean
             cs = stats.skew(data[values_col])
-            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs])
+            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-'])
 
             # Функция для форматирования чисел в таблице
             def custom_round(x):
@@ -98,14 +108,15 @@ if uploaded_file:
               selected_dist = getattr(stats, dist_key)
               params = selected_dist.fit(data[values_col])
               predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-              mae = mean_absolute_error(data[values_col], predict)
+              r2 = custom_round(r2_score(data[values_col], predict))
+              mae = custom_round(mean_absolute_error(data[values_col], predict))
 
               def f(x):
                 return selected_dist.ppf(1-x/100, *params)
               f2 = np.vectorize(f)
               x = np.arange(0.1, 99.9, 0.1)
               teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-              plt.plot(x, f2(x), label= f'Распределение {teor_label} ({round(mae, 1)})')
+              plt.plot(x, f2(x), label= f'Распределение {teor_label}')
 
               # сбор данных в таблицу c обеспеченностями
               df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
@@ -124,7 +135,7 @@ if uploaded_file:
               std = dist.std()
               cv = format_stat(std/mean)
               cs = format_stat(dist.stats(moments='s'))
-              parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs])
+              parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae])
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
@@ -132,8 +143,7 @@ if uploaded_file:
             plt.xscale('function', functions=[scalefunc, lambda x: x])
             ax.set(xlabel = "Обеспеченность, %")
             ax.set(ylabel = values_col)
-            ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности \n \
-            (в легенде в скобках указана средняя ошибка распределения)")
+            ax.set(title= f"Значения анализируемой величины с разной долей обеспеченности")
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
