@@ -145,7 +145,7 @@ if uploaded_file:
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             plt.legend()
-            st.pyplot(fig)
+            st.pyplot(fig, use_container_width=False)
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
               df_1 = df_1.T
