@@ -140,8 +140,8 @@ if uploaded_file:
             plt.xscale('function', functions=[scalefunc, lambda x: x])
             ax.set(xlabel = "Обеспеченность, %")
             ax.set(ylabel = values_col)
-            # ax.set(title= f"Значения с разной долей обеспеченности")
-            ax.set_title(f"Значения с разной долей обеспеченности", fontsize=10)
+            
+            ax.set_title(f"Значения с разной долей обеспеченности", fontsize=6)
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
