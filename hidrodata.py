@@ -196,10 +196,10 @@ if uploaded_file:
                                     numeric_values.append((i, float(val)))
                             
                             if len(numeric_values) >= 2:
-                                # Берем вторую строку (индекс 1) как базовую
+                                # Берем первую строку (индекс 0) как базовую
                                 base_value = None
                                 for idx, val in numeric_values:
-                                    if idx == 1:  # Вторая строка
+                                    if idx == 0:  # Вторая строка
                                         base_value = val
                                         break
                                 
@@ -258,7 +258,7 @@ if uploaded_file:
                                 if max_val > min_val:
                                     for i, val in numeric_values:
                                         # Чем меньше значение, тем больше красного (инвертируем нормализацию)
-                                        normalized = 1 - ((val - min_val) / (max_val - min_val))
+                                        normalized = ((val - min_val) / (max_val - min_val))
                                         colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
                             
                             return colors
