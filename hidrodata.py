@@ -101,10 +101,10 @@ if uploaded_file:
                 return np.format_float_positional(x, precision=3, fractional=False, trim='-')
             # Расчет точности для округления остальных чисел в таблице:
             sample = df.loc[0, values_col]
-                if sample == int(sample):
-                    precision = 1
-                else:
-                    precision = len(str(sample).split('.')[1])
+            if sample == int(sample):
+                precision = 1
+            else:
+                precision = len(str(sample).split('.')[1])
 
             # построение кривой с распределением
             for disribution in distributions_to_plot:
