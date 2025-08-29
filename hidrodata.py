@@ -92,13 +92,19 @@ if uploaded_file:
             cs = stats.skew(data[values_col])
             parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-'])
 
-            # Функция для форматирования чисел в таблице
+            # Функция для округления метрик
             def custom_round(x):
               abs_x = abs(x)
               if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
                 return round(x)
               else:  # Иначе оставляем 3 значащих цифры
                 return np.format_float_positional(x, precision=3, fractional=False, trim='-')
+            # Расчет точности для округления остальных чисел в таблице:
+            sample = df.loc[0, values_col]
+                if sample == int(sample):
+                    precision = 1
+                else:
+                    precision = len(str(sample).split('.')[1])
 
             # построение кривой с распределением
             for disribution in distributions_to_plot:
@@ -117,7 +123,7 @@ if uploaded_file:
               plt.plot(x, f2(x), label= f'Распределение {teor_label}', linewidth=0.7)
 
               # сбор данных в таблицу c обеспеченностями
-              df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: custom_round(selected_dist.ppf(1-x/100, *params)))
+              df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: round(selected_dist.ppf(1-x/100, *params), precision))
 
               # сбор данных в таблицу с параметрами распределения
               def format_stat(value):
@@ -125,11 +131,11 @@ if uploaded_file:
                 if np.isnan(value) or np.isinf(value):
                     return "Не существует"
                 else:
-                  return value
+                  return custom_round(value)
 
               dist = selected_dist(*params)
-              mean = dist.mean()
-              std = dist.std()
+              mean = custom_round(dist.mean())
+              std = custom_round(dist.std())
               cv = format_stat(std/mean)
               cs = format_stat(dist.stats(moments='s'))
               parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae])
@@ -138,16 +144,16 @@ if uploaded_file:
             # границ, шага и подписей делений для горизонтальной оси
             ax.xaxis.grid(True)
             plt.xscale('function', functions=[scalefunc, lambda x: x])
-            ax.set_xlabel("Обеспеченность, %", fontsize=6)
-            ax.set_ylabel(values_col, fontsize=6)       
-            ax.set_title(f"Значения с разной долей обеспеченности", fontsize=8)
+            ax.set_xlabel("Обеспеченность, %", fontsize=5)
+            ax.set_ylabel(values_col, fontsize=5)       
+            ax.set_title(f"Значения с разной долей обеспеченности", fontsize=6)
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             plt.legend()
-            ax.tick_params(axis='x', labelsize=6)
-            ax.tick_params(axis='y', labelsize=6)
-            legend = ax.legend(fontsize=6)
+            ax.tick_params(axis='x', labelsize=5)
+            ax.tick_params(axis='y', labelsize=5)
+            legend = ax.legend(fontsize=5)
             st.pyplot(fig, use_container_width=False)
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
@@ -166,13 +172,106 @@ if uploaded_file:
                 selected_dist = getattr(stats, dist_key)
                 params = selected_dist.fit(data[values_col])
                 teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-                custom_dict[teor_label] = custom_round(selected_dist.ppf(1-p/100, *params))
+                custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params)
               custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
               st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
             
             with st.expander("# 📋 Параметры и метрики качества полученных распределений", expanded=False):
-              parameters_df = parameters_df.T
-              st.markdown(parameters_df.to_html(index=True, header=False), unsafe_allow_html=True)
+                def get_red_transparent_color(value):
+                    """Возвращает красный цвет с регулируемой прозрачностью"""
+                    return f'rgba(255, 0, 0, {max(0, min(1, value))})'
+                
+                def style_dataframe(df):
+                    styler = df.style
+                    
+                    # Функция для первых 3 столбцов (отклонение от второй строки)
+                    def style_first_three(col):
+                        if col.name in df.columns[:3]:
+                            colors = [''] * len(col)
+                            numeric_values = []
+                            
+                            # Собираем числовые значения с индексами
+                            for i, val in enumerate(col):
+                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                                    numeric_values.append((i, float(val)))
+                            
+                            if len(numeric_values) >= 2:
+                                # Берем вторую строку (индекс 1) как базовую
+                                base_value = None
+                                for idx, val in numeric_values:
+                                    if idx == 1:  # Вторая строка
+                                        base_value = val
+                                        break
+                                
+                                if base_value is not None:
+                                    # Вычисляем максимальное отклонение
+                                    deviations = [abs(val - base_value) for _, val in numeric_values]
+                                    max_deviation = max(deviations) if deviations else 0
+                                    
+                                    if max_deviation > 0:
+                                        for (i, val), deviation in zip(numeric_values, deviations):
+                                            normalized = deviation / max_deviation
+                                            colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                            
+                            return colors
+                        return [''] * len(col)
+                    
+                    # Функция для 4 столбца (чем больше значение, тем менее красный)
+                    def style_fourth(col):
+                        if col.name == df.columns[3]:
+                            colors = [''] * len(col)
+                            numeric_values = []
+                            
+                            for i, val in enumerate(col):
+                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                                    numeric_values.append((i, float(val)))
+                            
+                            if len(numeric_values) >= 2:
+                                values = [val for _, val in numeric_values]
+                                max_val = max(values)
+                                min_val = min(values)
+                                
+                                if max_val > min_val:
+                                    for i, val in numeric_values:
+                                        # Инвертируем: чем больше значение, тем меньше красного
+                                        normalized = 1 - ((val - min_val) / (max_val - min_val))
+                                        colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                            
+                            return colors
+                        return [''] * len(col)
+                    
+                    # Функция для 5 столбца (чем меньше значение, тем ярче)
+                    def style_fifth(col):
+                        if col.name == df.columns[4]:
+                            colors = [''] * len(col)
+                            numeric_values = []
+                            
+                            for i, val in enumerate(col):
+                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                                    numeric_values.append((i, float(val)))
+                            
+                            if len(numeric_values) >= 2:
+                                values = [val for _, val in numeric_values]
+                                max_val = max(values)
+                                min_val = min(values)
+                                
+                                if max_val > min_val:
+                                    for i, val in numeric_values:
+                                        # Чем меньше значение, тем больше красного (инвертируем нормализацию)
+                                        normalized = 1 - ((val - min_val) / (max_val - min_val))
+                                        colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                            
+                            return colors
+                        return [''] * len(col)
+                    
+                    # Применяем стили ко всем столбцам
+                    styler = styler.apply(style_first_three, axis=0)
+                    styler = styler.apply(style_fourth, axis=0)
+                    styler = styler.apply(style_fifth, axis=0)
+                    
+                    return styler
+                parameters_df = style_dataframe(parameters_df.T)
+                st.markdown(parameters_df.to_html(index=True, header=False), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
