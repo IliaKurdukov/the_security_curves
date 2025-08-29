@@ -177,9 +177,13 @@ if uploaded_file:
               st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
             
             with st.expander("# 📋 Параметры и метрики качества полученных распределений", expanded=False):
-                def get_red_transparent_color(value):
-                    """Возвращает красный цвет с регулируемой прозрачностью"""
-                    return f'rgba(255, 0, 0, {max(0, min(1, value))})'
+                def get_green_red_gradient_color(value):
+                    """Возвращает цвет в градиенте от зеленого к красному"""
+                    # value от 0 до 1, где 0 - зеленый, 1 - красный
+                    r = int(255 * value)           # Красный увеличивается
+                    g = int(255 * (1 - value))     # Зеленый уменьшается  
+                    b = 0
+                    return f'rgba({r}, {g}, {b}, 0.8)'  # Добавляем небольшую прозрачность
                 
                 def style_dataframe(df):
                     styler = df.style
