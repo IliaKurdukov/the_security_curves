@@ -270,22 +270,9 @@ if uploaded_file:
                     styler = styler.apply(style_fifth, axis=0)
                     
                     return styler
-
+                parameters_df.set_index('Распределение' ,drop=True, inplace=True)
                 styled_df = style_dataframe(parameters_df.T)
-                html_content = styled_df.to_html(index=True)
-                
-                # Добавляем CSS чтобы скрыть заголовки
-                html_content = f"""
-                <style>
-                    thead {{
-                        display: none !important;
-                    }}
-                </style>
-                {html_content}
-                """
-                
-                st.markdown(html_content, unsafe_allow_html=True)
-                # st.markdown(styled_df.to_html(index=True, header=False), unsafe_allow_html=True)
+                st.markdown(styled_df.to_html(index=True, header=False), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
