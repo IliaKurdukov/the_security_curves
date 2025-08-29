@@ -112,8 +112,8 @@ if uploaded_file:
               selected_dist = getattr(stats, dist_key)
               params = selected_dist.fit(data[values_col])
               predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-              r2 = custom_round(r2_score(data[values_col], predict))
-              mae = custom_round(mean_absolute_error(data[values_col], predict))
+              r2 = r2_score(data[values_col], predict)
+              mae =mean_absolute_error(data[values_col], predict)
 
               def f(x):
                 return selected_dist.ppf(1-x/100, *params)
@@ -131,10 +131,10 @@ if uploaded_file:
                 if np.isnan(value) or np.isinf(value):
                     return "Не существует"
                 else:
-                  return custom_round(value)
+                  return value
 
               dist = selected_dist(*params)
-              mean = custom_round(dist.mean())
+              mean = dist.mean()
               std = dist.std()
               cv = format_stat(std/mean)
               cs = format_stat(dist.stats(moments='s'))
