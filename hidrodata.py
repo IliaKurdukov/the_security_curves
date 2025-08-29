@@ -177,101 +177,100 @@ if uploaded_file:
               st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
             
             with st.expander("# 📋 Параметры и метрики качества полученных распределений", expanded=False):
-                # def get_red_transparent_color(value):
-                #     """Возвращает красный цвет с регулируемой прозрачностью"""
-                #     return f'rgba(255, 0, 0, {max(0, min(1, value))})'
+                def get_red_transparent_color(value):
+                    """Возвращает красный цвет с регулируемой прозрачностью"""
+                    return f'rgba(255, 0, 0, {max(0, min(1, value))})'
                 
-                # def style_dataframe(df):
-                #     styler = df.style
+                def style_dataframe(df):
+                    styler = df.style
                     
-                #     # Функция для первых 3 столбцов (отклонение от второй строки)
-                #     def style_first_three(col):
-                #         if col.name in df.columns[:3]:
-                #             colors = [''] * len(col)
-                #             numeric_values = []
+                    # Функция для первых 3 столбцов (отклонение от второй строки)
+                    def style_first_three(col):
+                        if col.name in df.columns[:3]:
+                            colors = [''] * len(col)
+                            numeric_values = []
                             
-                #             # Собираем числовые значения с индексами
-                #             for i, val in enumerate(col):
-                #                 if isinstance(val, (int, float, np.number)) and pd.notna(val):
-                #                     numeric_values.append((i, float(val)))
+                            # Собираем числовые значения с индексами
+                            for i, val in enumerate(col):
+                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                                    numeric_values.append((i, float(val)))
                             
-                #             if len(numeric_values) >= 2:
-                #                 # Берем вторую строку (индекс 1) как базовую
-                #                 base_value = None
-                #                 for idx, val in numeric_values:
-                #                     if idx == 1:  # Вторая строка
-                #                         base_value = val
-                #                         break
+                            if len(numeric_values) >= 2:
+                                # Берем вторую строку (индекс 1) как базовую
+                                base_value = None
+                                for idx, val in numeric_values:
+                                    if idx == 1:  # Вторая строка
+                                        base_value = val
+                                        break
                                 
-                #                 if base_value is not None:
-                #                     # Вычисляем максимальное отклонение
-                #                     deviations = [abs(val - base_value) for _, val in numeric_values]
-                #                     max_deviation = max(deviations) if deviations else 0
+                                if base_value is not None:
+                                    # Вычисляем максимальное отклонение
+                                    deviations = [abs(val - base_value) for _, val in numeric_values]
+                                    max_deviation = max(deviations) if deviations else 0
                                     
-                #                     if max_deviation > 0:
-                #                         for (i, val), deviation in zip(numeric_values, deviations):
-                #                             normalized = deviation / max_deviation
-                #                             colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                                    if max_deviation > 0:
+                                        for (i, val), deviation in zip(numeric_values, deviations):
+                                            normalized = deviation / max_deviation
+                                            colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
                             
-                #             return colors
-                #         return [''] * len(col)
+                            return colors
+                        return [''] * len(col)
                     
-                #     # Функция для 4 столбца (чем больше значение, тем менее красный)
-                #     def style_fourth(col):
-                #         if col.name == df.columns[3]:
-                #             colors = [''] * len(col)
-                #             numeric_values = []
+                    # Функция для 4 столбца (чем больше значение, тем менее красный)
+                    def style_fourth(col):
+                        if col.name == df.columns[3]:
+                            colors = [''] * len(col)
+                            numeric_values = []
                             
-                #             for i, val in enumerate(col):
-                #                 if isinstance(val, (int, float, np.number)) and pd.notna(val):
-                #                     numeric_values.append((i, float(val)))
+                            for i, val in enumerate(col):
+                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                                    numeric_values.append((i, float(val)))
                             
-                #             if len(numeric_values) >= 2:
-                #                 values = [val for _, val in numeric_values]
-                #                 max_val = max(values)
-                #                 min_val = min(values)
+                            if len(numeric_values) >= 2:
+                                values = [val for _, val in numeric_values]
+                                max_val = max(values)
+                                min_val = min(values)
                                 
-                #                 if max_val > min_val:
-                #                     for i, val in numeric_values:
-                #                         # Инвертируем: чем больше значение, тем меньше красного
-                #                         normalized = 1 - ((val - min_val) / (max_val - min_val))
-                #                         colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                                if max_val > min_val:
+                                    for i, val in numeric_values:
+                                        # Инвертируем: чем больше значение, тем меньше красного
+                                        normalized = 1 - ((val - min_val) / (max_val - min_val))
+                                        colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
                             
-                #             return colors
-                #         return [''] * len(col)
+                            return colors
+                        return [''] * len(col)
                     
-                #     # Функция для 5 столбца (чем меньше значение, тем ярче)
-                #     def style_fifth(col):
-                #         if col.name == df.columns[4]:
-                #             colors = [''] * len(col)
-                #             numeric_values = []
+                    # Функция для 5 столбца (чем меньше значение, тем ярче)
+                    def style_fifth(col):
+                        if col.name == df.columns[4]:
+                            colors = [''] * len(col)
+                            numeric_values = []
                             
-                #             for i, val in enumerate(col):
-                #                 if isinstance(val, (int, float, np.number)) and pd.notna(val):
-                #                     numeric_values.append((i, float(val)))
+                            for i, val in enumerate(col):
+                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                                    numeric_values.append((i, float(val)))
                             
-                #             if len(numeric_values) >= 2:
-                #                 values = [val for _, val in numeric_values]
-                #                 max_val = max(values)
-                #                 min_val = min(values)
+                            if len(numeric_values) >= 2:
+                                values = [val for _, val in numeric_values]
+                                max_val = max(values)
+                                min_val = min(values)
                                 
-                #                 if max_val > min_val:
-                #                     for i, val in numeric_values:
-                #                         # Чем меньше значение, тем больше красного (инвертируем нормализацию)
-                #                         normalized = 1 - ((val - min_val) / (max_val - min_val))
-                #                         colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                                if max_val > min_val:
+                                    for i, val in numeric_values:
+                                        # Чем меньше значение, тем больше красного (инвертируем нормализацию)
+                                        normalized = 1 - ((val - min_val) / (max_val - min_val))
+                                        colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
                             
-                #             return colors
-                #         return [''] * len(col)
+                            return colors
+                        return [''] * len(col)
                     
-                #     # Применяем стили ко всем столбцам
-                #     styler = styler.apply(style_first_three, axis=0)
-                #     styler = styler.apply(style_fourth, axis=0)
-                #     styler = styler.apply(style_fifth, axis=0)
+                    # Применяем стили ко всем столбцам
+                    styler = styler.apply(style_first_three, axis=0)
+                    styler = styler.apply(style_fourth, axis=0)
+                    styler = styler.apply(style_fifth, axis=0)
                     
-                #     return styler
-                # parameters_df = style_dataframe(parameters_df.T)
-                parameters_df = parameters_df.T
+                    return styler
+                parameters_df = style_dataframe(parameters_df.T)
                 st.markdown(parameters_df.to_html(index=True, header=False), unsafe_allow_html=True)
 
     except Exception as e:
