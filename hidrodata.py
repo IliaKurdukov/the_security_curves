@@ -215,7 +215,7 @@ if uploaded_file:
                                     if max_deviation > 0:
                                         for (i, val), deviation in zip(numeric_values, deviations):
                                             normalized = deviation / max_deviation
-                                            colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                                            colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
                             
                             return colors
                         return [''] * len(col)
@@ -239,7 +239,7 @@ if uploaded_file:
                                     for i, val in numeric_values:
                                         # Инвертируем: чем больше значение, тем меньше красного
                                         normalized = 1 - ((val - min_val) / (max_val - min_val))
-                                        colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                                        colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
                             
                             return colors
                         return [''] * len(col)
@@ -263,7 +263,7 @@ if uploaded_file:
                                     for i, val in numeric_values:
                                         # Чем меньше значение, тем больше красного (инвертируем нормализацию)
                                         normalized = ((val - min_val) / (max_val - min_val))
-                                        colors[i] = f'background-color: {get_red_transparent_color(normalized)}'
+                                        colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
                             
                             return colors
                         return [''] * len(col)
