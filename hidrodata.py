@@ -88,9 +88,9 @@ if uploaded_file:
             parameters_df = pd.DataFrame(parameters, columns=['Распределение'])
             mean = data[values_col].mean()
             std = data[values_col].std()
-            cv = str(std/mean)
-            cs = str(stats.skew(data[values_col]))
-            parameters_df['Эмпирическое'] = pd.DataFrame([str(mean), cv, cs, '-', '-'])
+            cv = (std/mean)
+            cs = (stats.skew(data[values_col]))
+            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-'])
 
             # Функция для округления метрик
             def custom_round(x):
@@ -202,7 +202,7 @@ if uploaded_file:
                             # Собираем числовые значения с индексами
                             for i, val in enumerate(col):
                                 if isinstance(val, (int, float, np.number)) and pd.notna(val):
-                                    numeric_values.append((i, float(val)))
+                                    numeric_values.append((i, val))
                             
                             if len(numeric_values) >= 2:
                                 # Берем первую строку (индекс 0) как базовую
