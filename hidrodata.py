@@ -88,9 +88,9 @@ if uploaded_file:
             parameters_df = pd.DataFrame(parameters, columns=['Распределение'])
             mean = data[values_col].mean()
             std = data[values_col].std()
-            cv = std/mean
-            cs = stats.skew(data[values_col])
-            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-'])
+            cv = str(std/mean)
+            cs = str(stats.skew(data[values_col]))
+            parameters_df['Эмпирическое'] = pd.DataFrame([str(mean), cv, cs, '-', '-'])
 
             # Функция для округления метрик
             def custom_round(x):
@@ -193,7 +193,7 @@ if uploaded_file:
                 def style_dataframe(df):
                     styler = df.style
                     
-                    # Функция для первых 3 столбцов (отклонение от второй строки)
+                    # Функция для первых 3 столбцов (отклонение от первой строки)
                     def style_first_three(col):
                         if col.name in df.columns[:3]:
                             colors = [''] * len(col)
@@ -209,7 +209,7 @@ if uploaded_file:
                                 base_value = None
                                 for idx, val in numeric_values:
                                     if idx == 0:  # Вторая строка
-                                        base_value = val
+                                        base_value = float(val)
                                         break
                                 
                                 if base_value is not None:
