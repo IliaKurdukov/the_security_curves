@@ -200,7 +200,9 @@ if uploaded_file:
                             numeric_values = []
                             
                             # Собираем числовые значения с индексами
-                            for i, val in enumerate(col):
+                            # for i, val in enumerate(col):
+                            for i in range(1, len(col)):
+                                val = col.iloc[i]
                                 if isinstance(val, (int, float, np.number)) and pd.notna(val):
                                     numeric_values.append((i, val))
                             
