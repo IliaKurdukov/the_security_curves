@@ -178,12 +178,17 @@ if uploaded_file:
             
             with st.expander("# 📋 Параметры и метрики качества полученных распределений", expanded=False):
                 def get_green_red_gradient_color(value):
-                    """Возвращает цвет в градиенте от зеленого к красному"""
-                    # value от 0 до 1, где 0 - зеленый, 1 - красный
-                    r = int(255 * value)           # Красный увеличивается
-                    g = int(255 * (1 - value))     # Зеленый уменьшается  
-                    b = 0
-                    return f'rgba({r}, {g}, {b}, 0.8)'  # Добавляем небольшую прозрачность
+                    if value <= 0.5:
+                        # Зеленый (#63be7b) → Прозрачный
+                        progress = value / 0.5
+                        r, g, b = 99, 190, 123  # Зеленый
+                        alpha = 1 - progress
+                    else:
+                        # Прозрачный → Красный (#f8696b)
+                        progress = (value - 0.5) / 0.5
+                        r, g, b = 248, 105, 107  # Красный
+                        alpha = progress
+                    return f'rgba({r}, {g}, {b}, {alpha})'
                 
                 def style_dataframe(df):
                     styler = df.style
