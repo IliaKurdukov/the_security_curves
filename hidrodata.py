@@ -196,33 +196,29 @@ if uploaded_file:
                     # Функция для первых 3 столбцов (отклонение от первой строки)
                     def style_first_three(col):
                         if col.name in df.columns[:3]:
-                            colors = [''] * len(col)
+                            colors = [''] * len(col)  # Первая строка останется без цвета
                             numeric_values = []
                             
-                            # Собираем числовые значения с индексами
-                            # for i, val in enumerate(col):
-                            for i in range(1, len(col)):
-                                val = col.iloc[i]
-                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                            # Собираем числовые значения, начиная со второй строки (индекс 1)
+                            for i, val in enumerate(col):
+                                if i > 0 and isinstance(val, (int, float, np.number)) and pd.notna(val):
                                     numeric_values.append((i, val))
                             
-                            if len(numeric_values) >= 2:
+                            if len(numeric_values) >= 1:  # Достаточно хотя бы одного числового значения
                                 # Берем первую строку (индекс 0) как базовую
                                 base_value = None
-                                for idx, val in numeric_values:
-                                    if idx == 0:  # Вторая строка
-                                        base_value = float(val)
-                                        break
+                                if isinstance(col.iloc[0], (int, float, np.number)) and pd.notna(col.iloc[0]):
+                                    base_value = float(col.iloc[0])
                                 
                                 if base_value is not None:
-                                    # Вычисляем максимальное отклонение
+                                    # Вычисляем максимальное отклонение только для строк после первой
                                     deviations = [abs(val - base_value) for _, val in numeric_values]
                                     max_deviation = max(deviations) if deviations else 0
                                     
                                     if max_deviation > 0:
                                         for (i, val), deviation in zip(numeric_values, deviations):
                                             normalized = deviation / max_deviation
-                                            colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
+                                            colors[i] = f'background-color: {get_green_transparent_red_gradient_color(normalized)}'
                             
                             return colors
                         return [''] * len(col)
