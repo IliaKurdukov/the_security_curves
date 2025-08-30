@@ -218,7 +218,7 @@ if uploaded_file:
                                     if max_deviation > 0:
                                         for (i, val), deviation in zip(numeric_values, deviations):
                                             normalized = deviation / max_deviation
-                                            colors[i] = f'background-color: {get_green_transparent_red_gradient_color(normalized)}'
+                                            colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
                             
                             return colors
                         return [''] * len(col)
