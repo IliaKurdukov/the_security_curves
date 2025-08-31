@@ -204,7 +204,7 @@ if uploaded_file:
                                 if i > 0 and isinstance(val, (int, float, np.number)) and pd.notna(val):
                                     numeric_values.append((i, val))
                             
-                            if len(numeric_values) >= 1:  # Достаточно хотя бы одного числового значения
+                            if len(numeric_values) >= 2:  # Достаточно хотя бы одного числового значения
                                 # Берем первую строку (индекс 0) как базовую
                                 base_value = None
                                 if isinstance(col.iloc[0], (int, float, np.number)) and pd.notna(col.iloc[0]):
@@ -279,10 +279,7 @@ if uploaded_file:
                     return styler
                 parameters_df.set_index('Распределение' ,drop=True, inplace=True)
                 parameters_df = parameters_df.T
-                if len(parameters_df) > 2:
-                    styled_df = style_dataframe(parameters_df)
-                else:
-                    styled_df = parameters_df
+                styled_df = style_dataframe(parameters_df)
                 st.markdown(styled_df.to_html(index=True, header=True), unsafe_allow_html=True)
 
     except Exception as e:
