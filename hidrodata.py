@@ -196,33 +196,32 @@ if uploaded_file:
                     # Функция для первых 3 столбцов (отклонение от первой строки)
                     def style_first_three(col):
                         if col.name in df.columns[:3]:
-                            colors = [''] * len(col)  # Первая строка останется без цвета
-                            numeric_values = []
+                            colors = [''] * len(col)  # Первая строка без заливки
                             
-                            # Собираем числовые значения, начиная со второй строки (индекс 1)
-                            for i, val in enumerate(col):
-                                if i > 0 and isinstance(val, (int, float, np.number)) and pd.notna(val):
-                                    numeric_values.append((i, val))
+                            # Базовая значение из первой строки (гарантированно числовое)
+                            base_value = float(col.iloc[0])
                             
-                            if len(numeric_values) >= 2:  # Достаточно хотя бы одного числового значения
-                                # Берем первую строку (индекс 0) как базовую
-                                base_value = None
-                                if isinstance(col.iloc[0], (int, float, np.number)) and pd.notna(col.iloc[0]):
-                                    base_value = float(col.iloc[0])
-                                
-                                if base_value is not None:
-                                    # Вычисляем максимальное отклонение только для строк после первой
-                                    deviations = [abs(val - base_value) for _, val in numeric_values]
-                                    max_deviation = max(deviations) if deviations else 0
-                                    
-                                    if max_deviation > 0:
-                                        for (i, val), deviation in zip(numeric_values, deviations):
-                                            normalized = deviation / max_deviation
-                                            colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
+                            # Обрабатываем все строки кроме первой
+                            deviations = []
+                            valid_indices = []
+                            
+                            for i in range(1, len(col)):
+                                val = col.iloc[i]
+                                if isinstance(val, (int, float, np.number)) and pd.notna(val):
+                                    deviation = abs(float(val) - base_value)
+                                    deviations.append(deviation)
+                                    valid_indices.append(i)
+                            
+                            if deviations:
+                                max_deviation = max(deviations)
+                                if max_deviation > 0:
+                                    for i, deviation in zip(valid_indices, deviations):
+                                        normalized = deviation / max_deviation
+                                        colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
                             
                             return colors
                         return [''] * len(col)
-                    
+                                        
                     # Функция для 4 столбца (чем больше значение, тем менее красный)
                     def style_fourth(col):
                         if col.name == df.columns[3]:
