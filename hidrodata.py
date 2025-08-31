@@ -283,7 +283,7 @@ if uploaded_file:
                     styled_df = style_dataframe(parameters_df)
                 else:
                     styled_df = parameters_df
-                st.markdown(styled_df.to_html(index=True, header=False), unsafe_allow_html=True)
+                st.markdown(styled_df.to_html(index=True, header=True), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
