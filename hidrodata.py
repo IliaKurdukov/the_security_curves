@@ -198,26 +198,37 @@ if uploaded_file:
                         if col.name in df.columns[:3]:
                             colors = [''] * len(col)  # Первая строка без заливки
                             
-                            # Базовая значение из первой строки (гарантированно числовое)
-                            base_value = float(col.iloc[0])
+                            # Если всего 2 строки или меньше - не заливаем
+                            if len(col) <= 2:
+                                return colors
                             
-                            # Обрабатываем все строки кроме первой
-                            deviations = []
-                            valid_indices = []
+                            base_value = float(col.iloc[0])  # Гарантированно числовое
                             
+                            # Собираем числовые значения кроме первой строки
+                            numeric_data = []
                             for i in range(1, len(col)):
                                 val = col.iloc[i]
                                 if isinstance(val, (int, float, np.number)) and pd.notna(val):
-                                    deviation = abs(float(val) - base_value)
-                                    deviations.append(deviation)
-                                    valid_indices.append(i)
+                                    numeric_data.append((i, float(val)))
                             
-                            if deviations:
-                                max_deviation = max(deviations)
-                                if max_deviation > 0:
-                                    for i, deviation in zip(valid_indices, deviations):
-                                        normalized = deviation / max_deviation
-                                        colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
+                            # Нужно минимум 2 значения для сравнения (чтобы было самое близкое и самое далекое)
+                            if len(numeric_data) < 2:
+                                return colors
+                            
+                            # Находим минимальное и максимальное отклонение от базового значения
+                            deviations = [abs(val - base_value) for _, val in numeric_data]
+                            min_deviation = min(deviations)
+                            max_deviation = max(deviations)
+                            
+                            # Если все значения одинаковые (min == max), то все будут зелеными
+                            if max_deviation == min_deviation:
+                                for i, _ in numeric_data:
+                                    colors[i] = f'background-color: {get_green_red_gradient_color(0.0)}'  # Зеленый
+                            else:
+                                # Нормализуем отклонения от 0 до 1, где 0 - минимальное отклонение (зеленый), 1 - максимальное (красный)
+                                for (i, val), deviation in zip(numeric_data, deviations):
+                                    normalized = (deviation - min_deviation) / (max_deviation - min_deviation)
+                                    colors[i] = f'background-color: {get_green_red_gradient_color(normalized)}'
                             
                             return colors
                         return [''] * len(col)
