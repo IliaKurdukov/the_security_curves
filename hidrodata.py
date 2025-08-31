@@ -278,7 +278,11 @@ if uploaded_file:
                     
                     return styler
                 parameters_df.set_index('Распределение' ,drop=True, inplace=True)
-                styled_df = style_dataframe(parameters_df.T)
+                parameters_df = parameters_df.T
+                if len(parameters_df) > 2:
+                    styled_df = style_dataframe(parameters_df)
+                else:
+                    styled_df = parameters_df
                 st.markdown(styled_df.to_html(index=True, header=False), unsafe_allow_html=True)
 
     except Exception as e:
