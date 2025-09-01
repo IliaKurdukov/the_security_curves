@@ -291,6 +291,13 @@ if uploaded_file:
                 parameters_df = parameters_df.T
                 styled_df = style_dataframe(parameters_df)
                 st.markdown(styled_df.to_html(index=True, header=True), unsafe_allow_html=True)
+                st.markdown(f'Примечания к таблице: \n\
+                    Зелёным цветом показаны значения, ближайшие к эмпирическим, красным - самые удалённые.\n\
+                Расшифровка названий столбцов:\n\
+                    - Сv - коэффициент вариации\n\
+                    - Сs - коэффициент асимметри\n\
+                    - R² - коэффициент детерминации (чем ближе к 1, тем лучше модель описывает изменения в наблюдаемых данных)\n\
+                    - MAE - средняя абсолютная ошибка (среднее отклонение предсказаний от эмпирических данных)')
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
