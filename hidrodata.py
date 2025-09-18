@@ -6,6 +6,7 @@ import re
 import scipy.stats as stats
 import subprocess
 import sys
+import xlrd
 from sklearn.metrics import mean_absolute_error, r2_score
 
 st.set_page_config(
