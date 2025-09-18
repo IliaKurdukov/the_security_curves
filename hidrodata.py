@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import re
 import scipy.stats as stats
+import subprocess
+import sys
 from sklearn.metrics import mean_absolute_error, r2_score
 
 st.set_page_config(
@@ -16,10 +18,31 @@ st.set_page_config(
 )
 
 st.title("📉 Кривые обеспеченности")
-uploaded_file = st.file_uploader("Загрузите XLS файл")
+
+# Функция для чтения Excel с автоматической установкой зависимостей
+def smart_read_excel(uploaded_file):
+    file_extension = uploaded_file.name.split('.')[-1].lower()
+    
+    if file_extension == 'xls':
+        try:
+            return pd.read_excel(uploaded_file, engine='xlrd')
+        except ImportError:
+            # Устанавливаем xlrd если нужно
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "xlrd>=2.0.1"])
+            return pd.read_excel(uploaded_file, engine='xlrd')
+    
+    elif file_extension == 'xlsx':
+        try:
+            return pd.read_excel(uploaded_file, engine='openpyxl')
+        except ImportError:
+            # Устанавливаем openpyxl если нужно
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
+            return pd.read_excel(uploaded_file, engine='openpyxl')
+
+uploaded_file = st.file_uploader("Загрузите Excel файл", type=['xls', 'xlsx'])
 if uploaded_file:
     try:
-        df = pd.read_excel(uploaded_file)
+        df = smart_read_excel(uploaded_file)
         def pluralize_rows(number: int) -> str:
           if number % 10 == 1 and number % 100 != 11:
               return "строку"  # 1 строка (но 11, 111, 211 и т.д. — "строк")
@@ -73,7 +96,7 @@ if uploaded_file:
             x = data['Вероятность'] * 100
             y = data[values_col]
             plt.scatter(x, y,
-                        label='Эмпирическое распределение',
+                        label='Эмпирическое',
                         s=5,           # размер точек
                         facecolors='none', # без заливки
                         edgecolors='black', # черный контур
@@ -120,7 +143,7 @@ if uploaded_file:
               f2 = np.vectorize(f)
               x = np.arange(0.1, 99.9, 0.1)
               teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-              plt.plot(x, f2(x), label= f'Распределение {teor_label}', linewidth=0.7)
+              plt.plot(x, f2(x), label= f'{teor_label}', linewidth=0.7)
 
               # сбор данных в таблицу c обеспеченностями
               df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: round(selected_dist.ppf(1-x/100, *params), precision))
@@ -150,7 +173,7 @@ if uploaded_file:
             ax.set(xlim=(0.1,99.9))
             plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
             ax.set_xticklabels([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
-            plt.legend()
+            plt.legend(title='Вид распределения')
             ax.tick_params(axis='x', labelsize=5)
             ax.tick_params(axis='y', labelsize=5)
             legend = ax.legend(fontsize=5)
