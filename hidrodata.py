@@ -9,8 +9,12 @@ import sys
 import xlrd
 from sklearn.metrics import mean_absolute_error, r2_score
 
+ru_dict = {page_title: "Кривые обеспеченности",
+           title: "📉 Кривые обеспеченности"
+           
+
 st.set_page_config(
-    page_title="Кривые обеспеченности",
+    page_title=ru_dict[page_title],
     page_icon="📉",
     layout="wide",
     menu_items={
@@ -18,7 +22,7 @@ st.set_page_config(
     }
 )
 
-st.title("📉 Кривые обеспеченности")
+st.title(ru_dict[title])
 
 st.sidebar.markdown("""
 ### ℹ️ О проекте
@@ -36,8 +40,9 @@ st.sidebar.markdown("""
 - Опасные метеорологические явления
 - Снегоперенос
 - Испарение с водной поверхности
+Подробнее: [Камышев Арсений](https://t.me/Arseniikamyshev), [Курдюков Илья](https://t.me/ilia_kurdukov)
 
-Наш проект некоммерческий, и мы будем благодарны [вашей поддержке](https://tbank.ru/cf/2PlIaU81b0F) 🍩
+Наш проект некоммерческий, и мы будем благодарны [вашей поддержке](https://tbank.ru/cf/2PlIaU81b0F) на его развитие 🍩
 
 🙏 Спасибо за поддержку: Мише Самохину, Никите З., Татьяне Д., Елене Л., Марине М., Валентину Марченко, Татьяне Ш., Алмазу Х., Сергею, Ивану К.
 """)
