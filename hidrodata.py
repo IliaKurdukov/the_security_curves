@@ -10,7 +10,7 @@ import xlrd
 from sklearn.metrics import mean_absolute_error, r2_score
 
 ru_dict = {page_title: "Кривые обеспеченности",
-           title: "📉 Кривые обеспеченности"
+           title: "📉 Кривые обеспеченности"}
            
 
 st.set_page_config(
