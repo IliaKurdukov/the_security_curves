@@ -101,8 +101,6 @@ if uploaded_file:
             else:
               data = df[values_col]
             data = pd.DataFrame(data)
-            scaler = data[values_col].mean()
-            data['z'] = data[values_col] / scaler
             data = data.sort_values(by=values_col)
             data['Ранг'] = range(len(data))
             data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 2)
@@ -165,20 +163,20 @@ if uploaded_file:
             for disribution in distributions_to_plot:
               dist_key = distributions[disribution]
               selected_dist = getattr(stats, dist_key)
-              params = selected_dist.fit(data['z'])
-              predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params) * scaler)
+              params = selected_dist.fit(data[values_col])
+              predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
               r2 = r2_score(data[values_col], predict)
               mae =mean_absolute_error(data[values_col], predict)
 
               def f(x):
-                return selected_dist.ppf(1-x/100, *params) * scaler
+                return selected_dist.ppf(1-x/100, *params)
               f2 = np.vectorize(f)
               x = np.arange(0.1, 99.9, 0.1)
               teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
               plt.plot(x, f2(x), label= f'{teor_label}', linewidth=0.7)
 
               # сбор данных в таблицу c обеспеченностями
-              df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: round(selected_dist.ppf(1-x/100, *params) * scaler, precision))
+              df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: round(selected_dist.ppf(1-x/100, *params), precision))
 
               # сбор данных в таблицу с параметрами распределения
               def format_stat(value):
@@ -189,8 +187,8 @@ if uploaded_file:
                   return value
 
               dist = selected_dist(*params)
-              mean = dist.mean() * scaler
-              std = dist.std() * scaler
+              mean = dist.mean()
+              std = dist.std()
               cv = format_stat(std/mean)
               cs = format_stat(dist.stats(moments='s'))
               parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae])
@@ -226,9 +224,9 @@ if uploaded_file:
               for disribution in distributions_to_plot:
                 dist_key = distributions[disribution]
                 selected_dist = getattr(stats, dist_key)
-                params = selected_dist.fit(data['z'])
+                params = selected_dist.fit(data[values_col])
                 teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-                custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params) * scaler
+                custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params)
               custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
               st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
             
