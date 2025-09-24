@@ -7,6 +7,7 @@ import scipy.stats as stats
 import subprocess
 import sys
 import xlrd
+from abc import ABC, abstractmethod
 from sklearn.metrics import mean_absolute_error, r2_score
 
 ru_dict = {'page_title': "Кривые обеспеченности",
@@ -105,10 +106,118 @@ if uploaded_file:
             data['Ранг'] = range(len(data))
             data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 2)
 
-            distributions = {'Гумбеля (метод максимального правдоподобия)': 'gumbel_r',
-                            'Фреше (метод максимального правдоподобия)': 'invweibull',
-                            'Пирсона 3 типа (метод максимального правдоподобия)': 'pearson3',
-                            'Обобщенное (метод максимального правдоподобия)': 'genextreme'}
+            # Базовый интерфейс для всех распределений
+            class DistributionAdapter(ABC):
+                @abstractmethod
+                def fit(self, data):
+                    """Возвращает параметры распределения"""
+                    pass
+                @abstractmethod
+                def ppf(self, x, *params):
+                    """Квантильная функция"""
+                    pass
+                @property
+                @abstractmethod
+                def name(self):
+                    """Название распределения для отображения"""
+                    pass
+           
+            # Адаптер для Scipy распределений
+            class ScipyDistributionAdapter(DistributionAdapter):
+                def __init__(self, scipy_name, display_name):
+                    self._dist = getattr(stats, scipy_name)
+                    self._display_name = display_name
+                def fit(self, data):
+                    return self._dist.fit(data)
+                def ppf(self, x, *params):
+                    return self._dist.ppf(x, *params) 
+                @property
+                def name(self):
+                    return self._display_name
+           
+             # Адаптер для L-moments распределений
+             class LMomentsDistributionAdapter(DistributionAdapter):
+                 def __init__(self, lmoments_name, display_name):
+                     self._dist = getattr(lmoments, lmoments_name)  # предполагаемый API
+                     self._display_name = display_name
+                 def fit(self, data):
+                     # Предполагаемый API L-moments
+                     return self._dist.fit(data)
+                 def ppf(self, x, *params):
+                     return self._dist.ppf(x, *params)
+                 @property
+                 def name(self):
+                     return self._display_name
+           
+            # Адаптер для кастомных распределений
+            class CustomDistributionAdapter(DistributionAdapter):
+                def __init__(self, fit_func, ppf_func, display_name):
+                    self._fit_func = fit_func
+                    self._ppf_func = ppf_func
+                    self._display_name = display_name
+                def fit(self, data):
+                    return self._fit_func(data)
+                def ppf(self, x, *params):
+                    return self._ppf_func(x, *params)
+                @property
+                def name(self):
+                    return self._display_name
+           
+            # Фабрика для удобного создания распределений
+            class DistributionFactory:
+                @staticmethod
+                def scipy(scipy_name, display_name):
+                    return ScipyDistributionAdapter(scipy_name, display_name)
+                @staticmethod
+                def lmoments(lmoments_name, display_name):
+                    return LMomentsDistributionAdapter(lmoments_name, display_name)
+                @staticmethod
+                def custom(fit_func, ppf_func, display_name):
+                    return CustomDistributionAdapter(fit_func, ppf_func, display_name)
+
+            def km_pdf(k, γ, a, b):
+                return γ**γ / (a**(γ/b) * math.gamma(γ) * b) * math.exp(-γ*(k/a)**(1/b)) * k**(γ/b-1)
+           
+            def km_log_pdf(k, γ, a, b):
+                return γ * math.log(γ) - (γ/b)*math.log(a) - math.log(math.gamma(γ)) - math.log(b) - γ*(k/a)**(1/b) + (γ/b-1)*math.log(k)
+           
+            def km_cdf(k, γ, a, b):
+                integral, error = quad(km_pdf, 1e-10, k, args=(γ, a, b))
+                return integral
+           
+            def km_ppf(p, γ, a, b, bracket=[1e-10, 10]):
+                def equation(x):
+                    return km_cdf(x, γ, a, b) - p
+                sol = root_scalar(equation, bracket=bracket, method='brentq')
+                return (sol.root)
+           
+            def log_likelihood(params, data):
+                """Логарифмическое правдоподобие"""
+                γ, a, b = params
+                if γ <= 1e-10 or a <= 1e-10 or b <= 1e-10:
+                    return -1e10
+                total = 0.0
+                for z in data:
+                    if z <= 0:
+                        continue
+                    log_pdf = km_log_pdf(z, γ, a, b)
+                    total += log_pdf
+                return total
+           
+            def km_fit(data, initial_params = [2, 1, 1]):
+                result = minimize(
+                   lambda params: -log_likelihood(params, data),
+                   initial_params,
+                   method='L-BFGS-B',
+                   bounds=[(1e-10, None), (1e-10, None), (1e-10, None)],
+                   options={'maxiter': 10000, 'ftol': 1e-12}
+               )
+               return result.x
+                   
+            distributions = {'Гумбеля (ММП)': DistributionFactory.scipy('gumbel_r', 'Гумбеля (ММП)'),
+                             'Фреше (ММП)': DistributionFactory.scipy('invweibull', 'Фреше (ММП)'),
+                             'Пирсона 3 типа (ММП)': DistributionFactory.scipy('pearson3', 'Пирсона 3 типа (ММП)'),
+                             'Обобщенное (ММП)': DistributionFactory.scipy('genextreme', 'Обобщенное (ММП)')}
 
             distributions_to_plot = st.multiselect(
                 'Выберите распределение для аппроксимации',
@@ -161,8 +270,9 @@ if uploaded_file:
 
             # построение кривой с распределением
             for disribution in distributions_to_plot:
-              dist_key = distributions[disribution]
-              selected_dist = getattr(stats, dist_key)
+              selected_dist = distributions[disribution]
+              # dist_key = distributions[disribution]
+              # selected_dist = getattr(stats, dist_key)
               params = selected_dist.fit(data[values_col])
               predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
               r2 = r2_score(data[values_col], predict)
@@ -222,8 +332,9 @@ if uploaded_file:
               )
               custom_dict = {}
               for disribution in distributions_to_plot:
-                dist_key = distributions[disribution]
-                selected_dist = getattr(stats, dist_key)
+                selected_dist = distributions[disribution]
+                # dist_key = distributions[disribution]
+                # selected_dist = getattr(stats, dist_key)
                 params = selected_dist.fit(data[values_col])
                 teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
                 custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params)
