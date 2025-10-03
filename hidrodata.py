@@ -212,7 +212,7 @@ if uploaded_file:
                    bounds=[(1e-10, None), (1e-10, None), (1e-10, None)],
                    options={'maxiter': 10000, 'ftol': 1e-12}
                )
-               return result.x
+                return result.x
                    
             distributions = {'Гумбеля (ММП)': DistributionFactory.scipy('gumbel_r', 'Гумбеля (ММП)'),
                              'Фреше (ММП)': DistributionFactory.scipy('invweibull', 'Фреше (ММП)'),
