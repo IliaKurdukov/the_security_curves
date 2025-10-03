@@ -136,32 +136,32 @@ if uploaded_file:
                     return self._display_name
            
              # Адаптер для L-moments распределений
-             class LMomentsDistributionAdapter(DistributionAdapter):
-                 def __init__(self, lmoments_name, display_name):
-                     self._dist = getattr(lmoments, lmoments_name)  # предполагаемый API
-                     self._display_name = display_name
-                 def fit(self, data):
-                     # Предполагаемый API L-moments
-                     return self._dist.fit(data)
-                 def ppf(self, x, *params):
-                     return self._dist.ppf(x, *params)
-                 @property
-                 def name(self):
-                     return self._display_name
+             # class LMomentsDistributionAdapter(DistributionAdapter):
+             #     def __init__(self, lmoments_name, display_name):
+             #         self._dist = getattr(lmoments, lmoments_name)  # предполагаемый API
+             #         self._display_name = display_name
+             #     def fit(self, data):
+             #         # Предполагаемый API L-moments
+             #         return self._dist.fit(data)
+             #     def ppf(self, x, *params):
+             #         return self._dist.ppf(x, *params)
+             #     @property
+             #     def name(self):
+             #         return self._display_name
            
             # Адаптер для кастомных распределений
-            class CustomDistributionAdapter(DistributionAdapter):
-                def __init__(self, fit_func, ppf_func, display_name):
-                    self._fit_func = fit_func
-                    self._ppf_func = ppf_func
-                    self._display_name = display_name
-                def fit(self, data):
-                    return self._fit_func(data)
-                def ppf(self, x, *params):
-                    return self._ppf_func(x, *params)
-                @property
-                def name(self):
-                    return self._display_name
+            # class CustomDistributionAdapter(DistributionAdapter):
+            #     def __init__(self, fit_func, ppf_func, display_name):
+            #         self._fit_func = fit_func
+            #         self._ppf_func = ppf_func
+            #         self._display_name = display_name
+            #     def fit(self, data):
+            #         return self._fit_func(data)
+            #     def ppf(self, x, *params):
+            #         return self._ppf_func(x, *params)
+            #     @property
+            #     def name(self):
+            #         return self._display_name
            
             # Фабрика для удобного создания распределений
             class DistributionFactory:
