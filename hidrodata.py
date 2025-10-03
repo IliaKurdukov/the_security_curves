@@ -296,7 +296,7 @@ if uploaded_file:
                 else:
                   return value
 
-              dist = selected_dist_dist(*params)
+              dist = selected_dist._dist(*params)
               mean = dist.mean()
               std = dist.std()
               cv = format_stat(std/mean)
