@@ -8,7 +8,7 @@ import subprocess
 import sys
 import xlrd
 from abc import ABC, abstractmethod
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, r2_score, max_error
 
 ru_dict = {'page_title': "Кривые обеспеченности",
            'title': "📉 Кривые обеспеченности"}
@@ -47,7 +47,7 @@ st.sidebar.markdown("""
 
 Наш проект некоммерческий, и мы будем благодарны [вашей поддержке](https://tbank.ru/cf/2PlIaU81b0F) на его развитие 🍩
 
-🙏 Спасибо за поддержку: Мише Самохину, Никите З., Татьяне Д., Елене Л., Марине М., Валентину Марченко, Татьяне Ш., Алмазу Х., Сергею, Ивану К.
+🙏 Спасибо за поддержку: Мише Самохину, Никите З., Татьяне Д., Елене Л., Марине М., Валентину Марченко, Татьяне Ш., Алмазу Х., Сергею, Ивану К., Евгению К., Константину Д., Дмитрию К.
 """)
 
 # Функция для чтения Excel с автоматической установкой зависимостей
@@ -246,13 +246,13 @@ if uploaded_file:
             df_1 = pd.DataFrame(percent_list_1, columns=['Обеспеченность'])
 
             # таблица характеристик
-            parameters = ['Среднее', 'Cv', 'Cs', 'R²', 'MAE']
+            parameters = ['Среднее', 'Cv', 'Cs', 'R²', 'MAE', 'maxE']
             parameters_df = pd.DataFrame(parameters, columns=['Распределение'])
             mean = data[values_col].mean()
             std = data[values_col].std()
             cv = (std/mean)
             cs = (stats.skew(data[values_col]))
-            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-'])
+            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-', '-'])
 
             # Функция для округления метрик
             def custom_round(x):
@@ -277,6 +277,7 @@ if uploaded_file:
               predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
               r2 = r2_score(data[values_col], predict)
               mae =mean_absolute_error(data[values_col], predict)
+              maxE = max_error(data[values_col], predict)
 
               def f(x):
                 return selected_dist.ppf(1-x/100, *params)
@@ -301,7 +302,7 @@ if uploaded_file:
               std = dist.std()
               cv = format_stat(std/mean)
               cs = format_stat(dist.stats(moments='s'))
-              parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae])
+              parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae, maxE])
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
@@ -422,9 +423,9 @@ if uploaded_file:
                             return colors
                         return [''] * len(col)
                     
-                    # Функция для 5 столбца (чем меньше значение, тем ярче)
+                    # Функция для 5, 6 столбца (чем меньше значение, тем ярче)
                     def style_fifth(col):
-                        if col.name == df.columns[4]:
+                        if col.name == df.columns[4:]:
                             colors = [''] * len(col)
                             numeric_values = []
                             
@@ -474,6 +475,8 @@ if uploaded_file:
                             &nbsp;&nbsp;&nbsp;&nbsp;• <b>R²</b> - коэффициент детерминации (чем ближе к 1, тем лучше модель описывает изменения в наблюдаемых данных)
                             <br>
                             &nbsp;&nbsp;&nbsp;&nbsp;• <b>MAE</b> - средняя абсолютная ошибка (среднее отклонение предсказаний от эмпирических данных)
+                            <br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>maxEE</b> - максимальная абсолютная ошибка (максимальное отклонение предсказаний от эмпирических данных)
                             """, unsafe_allow_html=True)
 
     except Exception as e:
