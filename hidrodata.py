@@ -29,7 +29,7 @@ st.sidebar.markdown("""
 ### ℹ️ О проекте
 Приложение автоматически строит кривые обеспеченности по сырым данным.
 
-Пишите ваши вопросы и предложения, узнавайте актуальные новости и информацию о других проектах в области гидрометеорологии в [нашем канале](https://t.me/+g8Kjj2t8hvsxYmJi).
+Пишите ваши вопросы и предложения, узнавайте актуальные новости и информацию о других проектов в области гидрометеорологии в [нашем канале](https://t.me/+g8Kjj2t8hvsxYmJi).
 
 Также осуществляем расчет климатических параметров по вашим данным или по имеющейся базе данных из 600+ метеостанций:
 - Температура воздуха и почвы
@@ -75,12 +75,12 @@ if uploaded_file:
     try:
         df = smart_read_excel(uploaded_file)
         def pluralize_rows(number: int) -> str:
-          if number % 10 == 1 and number % 100 != 11:
-              return "строку"  # 1 строка (но 11, 111, 211 и т.д. — "строк")
-          elif 2 <= number % 10 <= 4 and (number % 100 < 10 or number % 100 >= 20):
-              return "строки"  # 2, 3, 4 строки (но 12, 13, 14 — "строк")
-          else:
-              return "строк"  # 0, 5-20, 25-30 и т.д.
+            if number % 10 == 1 and number % 100 != 11:
+                return "строку"  # 1 строка (но 11, 111, 211 и т.д. — "строк")
+            elif 2 <= number % 10 <= 4 and (number % 100 < 10 or number % 100 >= 20):
+                return "строки"  # 2, 3, 4 строки (но 12, 13, 14 — "строк")
+            else:
+                return "строк"  # 0, 5-20, 25-30 и т.д.
         st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}")
         with st.expander("# 🔢 Фрагмент загруженных данных", expanded=False):
             st.markdown(df.head().to_html(), unsafe_allow_html=True)
@@ -96,11 +96,11 @@ if uploaded_file:
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
             if index_col != 'Без группировки':
-              aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
-              aggfunc_dict = {'Максимальные значения': 'max', 'Средние значения': 'mean', 'Минимальные значения': 'min'}
-              data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
+                aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
+                aggfunc_dict = {'Максимальные значения': 'max', 'Средние значения': 'mean', 'Минимальные значения': 'min'}
+                data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
             else:
-              data = df[values_col]
+                data = df[values_col]
             data = pd.DataFrame(data)
             data = data.sort_values(by=values_col)
             data['Ранг'] = range(len(data))
@@ -135,19 +135,32 @@ if uploaded_file:
                 def name(self):
                     return self._display_name
            
-             # Адаптер для L-moments распределений
-             # class LMomentsDistributionAdapter(DistributionAdapter):
-             #     def __init__(self, lmoments_name, display_name):
-             #         self._dist = getattr(lmoments, lmoments_name)  # предполагаемый API
-             #         self._display_name = display_name
-             #     def fit(self, data):
-             #         # Предполагаемый API L-moments
-             #         return self._dist.fit(data)
-             #     def ppf(self, x, *params):
-             #         return self._dist.ppf(x, *params)
-             #     @property
-             #     def name(self):
-             #         return self._display_name
+            # Адаптер для L-moments распределений
+            class LMomentsDistributionAdapter(DistributionAdapter):
+                def __init__(self, lmoments_name, display_name):
+                    self._lmoments_name = lmoments_name
+                    self._display_name = display_name
+                def fit(self, data):
+                    try:
+                        import lmoments3 as lm
+                        from lmoments3 import distr
+                        dist_func = getattr(distr, self._lmoments_name)
+                        return list(dist_func.lmom_fit(data).values())
+                    except ImportError:
+                        # Устанавливаем lmoments3 если нужно
+                        subprocess.check_call([sys.executable, "-m", "pip", "install", "lmoments3"])
+                        import lmoments3 as lm
+                        from lmoments3 import distr
+                        dist_func = getattr(distr, self._lmoments_name)
+                        return list(dist_func.lmom_fit(data).values())
+                def ppf(self, x, *params):
+                    import lmoments3 as lm
+                    from lmoments3 import distr
+                    dist_func = getattr(distr, self._lmoments_name)
+                    return dist_func.ppf(x, *params)
+                @property
+                def name(self):
+                    return self._display_name
            
             # Адаптер для кастомных распределений
             # class CustomDistributionAdapter(DistributionAdapter):
@@ -171,63 +184,68 @@ if uploaded_file:
                 @staticmethod
                 def lmoments(lmoments_name, display_name):
                     return LMomentsDistributionAdapter(lmoments_name, display_name)
-                @staticmethod
-                def custom(fit_func, ppf_func, display_name):
-                    return CustomDistributionAdapter(fit_func, ppf_func, display_name)
+                # @staticmethod
+                # def custom(fit_func, ppf_func, display_name):
+                #     return CustomDistributionAdapter(fit_func, ppf_func, display_name)
 
-            def km_pdf(k, γ, a, b):
-                return γ**γ / (a**(γ/b) * math.gamma(γ) * b) * math.exp(-γ*(k/a)**(1/b)) * k**(γ/b-1)
+            # def km_pdf(k, γ, a, b):
+            #     return γ**γ / (a**(γ/b) * math.gamma(γ) * b) * math.exp(-γ*(k/a)**(1/b)) * k**(γ/b-1)
            
-            def km_log_pdf(k, γ, a, b):
-                return γ * math.log(γ) - (γ/b)*math.log(a) - math.log(math.gamma(γ)) - math.log(b) - γ*(k/a)**(1/b) + (γ/b-1)*math.log(k)
+            # def km_log_pdf(k, γ, a, b):
+            #     return γ * math.log(γ) - (γ/b)*math.log(a) - math.log(math.gamma(γ)) - math.log(b) - γ*(k/a)**(1/b) + (γ/b-1)*math.log(k)
            
-            def km_cdf(k, γ, a, b):
-                integral, error = quad(km_pdf, 1e-10, k, args=(γ, a, b))
-                return integral
+            # def km_cdf(k, γ, a, b):
+            #     integral, error = quad(km_pdf, 1e-10, k, args=(γ, a, b))
+            #     return integral
            
-            def km_ppf(p, γ, a, b, bracket=[1e-10, 10]):
-                def equation(x):
-                    return km_cdf(x, γ, a, b) - p
-                sol = root_scalar(equation, bracket=bracket, method='brentq')
-                return (sol.root)
+            # def km_ppf(p, γ, a, b, bracket=[1e-10, 10]):
+            #     def equation(x):
+            #         return km_cdf(x, γ, a, b) - p
+            #     sol = root_scalar(equation, bracket=bracket, method='brentq')
+            #     return (sol.root)
            
-            def log_likelihood(params, data):
-                """Логарифмическое правдоподобие"""
-                γ, a, b = params
-                if γ <= 1e-10 or a <= 1e-10 or b <= 1e-10:
-                    return -1e10
-                total = 0.0
-                for z in data:
-                    if z <= 0:
-                        continue
-                    log_pdf = km_log_pdf(z, γ, a, b)
-                    total += log_pdf
-                return total
+            # def log_likelihood(params, data):
+            #     """Логарифмическое правдоподобие"""
+            #     γ, a, b = params
+            #     if γ <= 1e-10 or a <= 1e-10 or b <= 1e-10:
+            #         return -1e10
+            #     total = 0.0
+            #     for z in data:
+            #         if z <= 0:
+            #             continue
+            #         log_pdf = km_log_pdf(z, γ, a, b)
+            #         total += log_pdf
+            #     return total
            
-            def km_fit(data, initial_params = [2, 1, 1]):
-                result = minimize(
-                   lambda params: -log_likelihood(params, data),
-                   initial_params,
-                   method='L-BFGS-B',
-                   bounds=[(1e-10, None), (1e-10, None), (1e-10, None)],
-                   options={'maxiter': 10000, 'ftol': 1e-12}
-               )
-                return result.x
-                   
-            distributions = {'Гумбеля (ММП)': DistributionFactory.scipy('gumbel_r', 'Гумбеля (ММП)'),
-                             'Фреше (ММП)': DistributionFactory.scipy('invweibull', 'Фреше (ММП)'),
-                             'Пирсона 3 типа (ММП)': DistributionFactory.scipy('pearson3', 'Пирсона 3 типа (ММП)'),
-                             'Обобщенное (ММП)': DistributionFactory.scipy('genextreme', 'Обобщенное (ММП)')}
+            # def km_fit(data, initial_params = [2, 1, 1]):
+            #     result = minimize(
+            #        lambda params: -log_likelihood(params, data),
+            #        initial_params,
+            #        method='L-BFGS-B',
+            #        bounds=[(1e-10, None), (1e-10, None), (1e-10, None)],
+            #        options={'maxiter': 10000, 'ftol': 1e-12}
+            #    )
+            #     return result.x
+
+            distributions = {
+                'Гумбеля (ММП)': DistributionFactory.scipy('gumbel_r', 'Гумбеля (ММП)'),
+                'Фреше (ММП)': DistributionFactory.scipy('invweibull', 'Фреше (ММП)'),
+                'Пирсона 3 типа (ММП)': DistributionFactory.scipy('pearson3', 'Пирсона 3 типа (ММП)'),
+                'Обобщенное (ММП)': DistributionFactory.scipy('genextreme', 'Обобщенное (ММП)'),
+                'Гумбеля (L-мом)': DistributionFactory.lmoments('gum', 'Гумбеля (L-мом)'),
+                'Пирсона 3 типа (L-мом)': DistributionFactory.lmoments('pe3', 'Пирсона 3 типа (L-мом)'),
+                'Обобщенное (L-мом)': DistributionFactory.lmoments('gev', 'Обобщенное (L-мом)')
+            }
 
             distributions_to_plot = st.multiselect(
                 'Выберите распределение для аппроксимации',
                 distributions,
                 default = [list(distributions)[-1]]
-                )
+            )
 
             # инициализация функции для изменения масштаба по горизонтальной оси
             def scalefunc(x):
-              return stats.norm.ppf(x/100, loc=0, scale=1)
+                return stats.norm.ppf(x/100, loc=0, scale=1)
 
             # График, таблица
             fig, ax = plt.subplots(figsize=(4, 2))
@@ -256,11 +274,12 @@ if uploaded_file:
 
             # Функция для округления метрик
             def custom_round(x):
-              abs_x = abs(x)
-              if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
-                return round(x)
-              else:  # Иначе оставляем 3 значащих цифры
-                return np.format_float_positional(x, precision=3, fractional=False, trim='-')
+                abs_x = abs(x)
+                if abs_x >= 100:  # Если 3+ знака до запятой → округляем до целого
+                    return round(x)
+                else:  # Иначе оставляем 3 значащих цифры
+                    return np.format_float_positional(x, precision=3, fractional=False, trim='-')
+            
             # Расчет точности для округления остальных чисел в таблице:
             sample = df.loc[0, values_col]
             if sample == int(sample):
@@ -269,40 +288,56 @@ if uploaded_file:
                 precision = len(str(sample).split('.')[1])
 
             # построение кривой с распределением
-            for disribution in distributions_to_plot:
-              selected_dist = distributions[disribution]
-              # dist_key = distributions[disribution]
-              # selected_dist = getattr(stats, dist_key)
-              params = selected_dist.fit(data[values_col])
-              predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-              r2 = r2_score(data[values_col], predict)
-              mae =mean_absolute_error(data[values_col], predict)
-              maxE = max_error(data[values_col], predict)
+            for distribution in distributions_to_plot:
+                selected_dist = distributions[distribution]
+                params = selected_dist.fit(data[values_col])
+                predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
+                r2 = r2_score(data[values_col], predict)
+                mae = mean_absolute_error(data[values_col], predict)
+                maxE = max_error(data[values_col], predict)
 
-              def f(x):
-                return selected_dist.ppf(1-x/100, *params)
-              f2 = np.vectorize(f)
-              x = np.arange(0.1, 99.9, 0.1)
-              teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-              plt.plot(x, f2(x), label= f'{teor_label}', linewidth=0.7)
+                def f(x):
+                    return selected_dist.ppf(1-x/100, *params)
+                f2 = np.vectorize(f)
+                x_teor = np.arange(0.1, 99.9, 0.1)
+                teor_label = re.sub(r'\s*\([^)]*\)$', '', distribution)
+                plt.plot(x_teor, f2(x_teor), label= f'{teor_label}', linewidth=0.7)
 
-              # сбор данных в таблицу c обеспеченностями
-              df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: round(selected_dist.ppf(1-x/100, *params), precision))
+                # сбор данных в таблицу c обеспеченностями
+                df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: round(selected_dist.ppf(1-x/100, *params), precision))
 
-              # сбор данных в таблицу с параметрами распределения
-              def format_stat(value):
-                """Форматирует статистику: заменяет nan/inf на 'Не существует'."""
-                if np.isnan(value) or np.isinf(value):
-                    return "Не существует"
-                else:
-                  return value
+                # сбор данных в таблицу с параметрами распределения
+                def format_stat(value):
+                    """Форматирует статистику: заменяет nan/inf на 'Не существует'."""
+                    if np.isnan(value) or np.isinf(value):
+                        return "Не существует"
+                    else:
+                        return value
 
-              dist = selected_dist._dist(*params)
-              mean = dist.mean()
-              std = dist.std()
-              cv = format_stat(std/mean)
-              cs = format_stat(dist.stats(moments='s'))
-              parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae, maxE])
+                # Для scipy распределений
+                if isinstance(selected_dist, ScipyDistributionAdapter):
+                    dist = selected_dist._dist(*params)
+                    mean = dist.mean()
+                    std = dist.std()
+                    cv = format_stat(std/mean)
+                    cs = format_stat(dist.stats(moments='s'))
+                # Для L-moments распределений
+                elif isinstance(selected_dist, LMomentsDistributionAdapter):
+                    try:
+                        import lmoments3 as lm
+                        from lmoments3 import distr
+                        dist_func = getattr(distr, selected_dist._lmoments_name)
+                        # Для L-moments нужно вычислить моменты через параметры
+                        mean = np.mean(data[values_col])  # Временное решение
+                        std = np.std(data[values_col])    # Временное решение
+                        cv = format_stat(std/mean)
+                        cs = format_stat(stats.skew(data[values_col]))  # Временное решение
+                    except:
+                        mean = "Ошибка"
+                        cv = "Ошибка"
+                        cs = "Ошибка"
+                
+                parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae, maxE])
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
@@ -321,26 +356,24 @@ if uploaded_file:
             st.pyplot(fig, use_container_width=False)
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
-              df_1 = df_1.T
-              st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
+                df_1 = df_1.T
+                st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
 
-              # ввод значений
-              p = st.number_input(
-              "Выберите обеспеченность для расчета значения (0 < P < 100)",
-              min_value=0.001,
-              max_value=99.999,
-              format="%.3f"
-              )
-              custom_dict = {}
-              for disribution in distributions_to_plot:
-                selected_dist = distributions[disribution]
-                # dist_key = distributions[disribution]
-                # selected_dist = getattr(stats, dist_key)
-                params = selected_dist.fit(data[values_col])
-                teor_label = re.sub(r'\s*\([^)]*\)$', '', disribution)
-                custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params)
-              custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
-              st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
+                # ввод значений
+                p = st.number_input(
+                "Выберите обеспеченность для расчета значения (0 < P < 100)",
+                min_value=0.001,
+                max_value=99.999,
+                format="%.3f"
+                )
+                custom_dict = {}
+                for distribution in distributions_to_plot:
+                    selected_dist = distributions[distribution]
+                    params = selected_dist.fit(data[values_col])
+                    teor_label = re.sub(r'\s*\([^)]*\)$', '', distribution)
+                    custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params)
+                custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
+                st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
             
             with st.expander("# 📋 Параметры и метрики качества полученных распределений", expanded=False):
                 def get_green_red_gradient_color(value):
@@ -424,8 +457,8 @@ if uploaded_file:
                         return [''] * len(col)
                     
                     # Функция для 5, 6 столбца (чем меньше значение, тем ярче)
-                    def style_fifth(col):
-                        if col.name == df.columns[4:]:
+                    def style_fifth_sixth(col):
+                        if col.name in df.columns[4:6]:  # Исправлено: проверяем вхождение в срез
                             colors = [''] * len(col)
                             numeric_values = []
                             
@@ -450,9 +483,10 @@ if uploaded_file:
                     # Применяем стили ко всем столбцам
                     styler = styler.apply(style_first_three, axis=0)
                     styler = styler.apply(style_fourth, axis=0)
-                    styler = styler.apply(style_fifth, axis=0)
+                    styler = styler.apply(style_fifth_sixth, axis=0)
                     
                     return styler
+                
                 parameters_df.set_index('Распределение' ,drop=True, inplace=True)
                 parameters_df = parameters_df.T
                 styled_df = style_dataframe(parameters_df)
@@ -476,7 +510,7 @@ if uploaded_file:
                             <br>
                             &nbsp;&nbsp;&nbsp;&nbsp;• <b>MAE</b> - средняя абсолютная ошибка (среднее отклонение предсказаний от эмпирических данных)
                             <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>maxEE</b> - максимальная абсолютная ошибка (максимальное отклонение предсказаний от эмпирических данных)
+                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>maxE</b> - максимальная абсолютная ошибка (максимальное отклонение предсказаний от эмпирических данных)
                             """, unsafe_allow_html=True)
 
     except Exception as e:
