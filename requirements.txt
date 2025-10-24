@@ -6,3 +6,4 @@ scipy
 scikit-learn==1.7.0
 openpyxl
 xlrd>=2.0.1
+lmoments3
