@@ -9,6 +9,8 @@ import sys
 import xlrd
 from abc import ABC, abstractmethod
 from sklearn.metrics import mean_absolute_error, r2_score, max_error
+import lmoments3 as lm
+from lmoments3 import distr
 
 ru_dict = {'page_title': "Кривые обеспеченности",
            'title': "📉 Кривые обеспеченности"}
@@ -141,21 +143,9 @@ if uploaded_file:
                     self._lmoments_name = lmoments_name
                     self._display_name = display_name
                 def fit(self, data):
-                    try:
-                        import lmoments3 as lm
-                        from lmoments3 import distr
-                        dist_func = getattr(distr, self._lmoments_name)
-                        return list(dist_func.lmom_fit(data).values())
-                    except ImportError:
-                        # Устанавливаем lmoments3 если нужно
-                        subprocess.check_call([sys.executable, "-m", "pip", "install", "lmoments3"])
-                        import lmoments3 as lm
-                        from lmoments3 import distr
-                        dist_func = getattr(distr, self._lmoments_name)
-                        return list(dist_func.lmom_fit(data).values())
+                    dist_func = getattr(distr, self._lmoments_name)
+                    return list(dist_func.lmom_fit(data).values())
                 def ppf(self, x, *params):
-                    import lmoments3 as lm
-                    from lmoments3 import distr
                     dist_func = getattr(distr, self._lmoments_name)
                     return dist_func.ppf(x, *params)
                 @property
@@ -300,7 +290,7 @@ if uploaded_file:
                     return selected_dist.ppf(1-x/100, *params)
                 f2 = np.vectorize(f)
                 x_teor = np.arange(0.1, 99.9, 0.1)
-                teor_label = re.sub(r'\s*\([^)]*\)$', '', distribution)
+                teor_label = distribution
                 plt.plot(x_teor, f2(x_teor), label= f'{teor_label}', linewidth=0.7)
 
                 # сбор данных в таблицу c обеспеченностями
@@ -324,15 +314,23 @@ if uploaded_file:
                 # Для L-moments распределений
                 elif isinstance(selected_dist, LMomentsDistributionAdapter):
                     try:
-                        import lmoments3 as lm
-                        from lmoments3 import distr
-                        dist_func = getattr(distr, selected_dist._lmoments_name)
-                        # Для L-moments нужно вычислить моменты через параметры
-                        mean = np.mean(data[values_col])  # Временное решение
-                        std = np.std(data[values_col])    # Временное решение
+                        # Создаем соответствующее scipy распределение с параметрами L-moments
+                        if selected_dist._lmoments_name == 'gum':
+                            # Гумбеля: loc, scale
+                            dist = stats.gumbel_r(loc=params[0], scale=params[1])
+                        elif selected_dist._lmoments_name == 'pe3':
+                            # Пирсон 3 типа: skew, loc, scale
+                            dist = stats.pearson3(skew=params[0], loc=params[1], scale=params[2])
+                        elif selected_dist._lmoments_name == 'gev':
+                            # Обобщенное экстремальное: c, loc, scale
+                            dist = stats.genextreme(c=params[0], loc=params[1], scale=params[2])
+                        
+                        mean = dist.mean()
+                        std = dist.std()
                         cv = format_stat(std/mean)
-                        cs = format_stat(stats.skew(data[values_col]))  # Временное решение
-                    except:
+                        cs = format_stat(dist.stats(moments='s'))
+                    except Exception as e:
+                        st.warning(f"Ошибка при расчете статистик для {distribution}: {str(e)}")
                         mean = "Ошибка"
                         cv = "Ошибка"
                         cs = "Ошибка"
@@ -370,7 +368,7 @@ if uploaded_file:
                 for distribution in distributions_to_plot:
                     selected_dist = distributions[distribution]
                     params = selected_dist.fit(data[values_col])
-                    teor_label = re.sub(r'\s*\([^)]*\)$', '', distribution)
+                    teor_label = distribution
                     custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params)
                 custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
                 st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
