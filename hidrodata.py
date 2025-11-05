@@ -340,7 +340,7 @@ if uploaded_file:
                 def f(x):
                     return selected_dist.ppf(1-x/100, *params)
                 f2 = np.vectorize(f)
-                x_teor = np.arange(0.1, 99.9, 0.1)
+                x_teor = np.arange(0.1, 99.9, 0.2)
                 teor_label = distribution
                 plt.plot(x_teor, f2(x_teor), label= f'{teor_label}', linewidth=0.7)
 
