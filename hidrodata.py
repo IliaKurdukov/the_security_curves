@@ -11,6 +11,9 @@ from abc import ABC, abstractmethod
 from sklearn.metrics import mean_absolute_error, r2_score, max_error
 import lmoments3 as lm
 from lmoments3 import distr
+from scipy.optimize import minimize
+from scipy.integrate import quad
+import math
 
 ru_dict = {'page_title': "Кривые обеспеченности",
            'title': "📉 Кривые обеспеченности"}
@@ -72,6 +75,80 @@ def smart_read_excel(uploaded_file):
             subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
             return pd.read_excel(uploaded_file, engine='openpyxl')
 
+# Функции для распределения Крицкого-Менкеля
+def km_pdf(k, γ, a, b):
+    return γ**γ / (a**(γ/b) * math.gamma(γ) * b) * math.exp(-γ*(k/a)**(1/b)) * k**(γ/b-1)
+
+def km_log_pdf(k, γ, a, b):
+    return γ * math.log(γ) - (γ/b)*math.log(a) - math.log(math.gamma(γ)) - math.log(b) - γ*(k/a)**(1/b) + (γ/b-1)*math.log(k)
+
+def km_cdf(k, γ, a, b):
+    integral, error = quad(km_pdf, 1e-10, k, args=(γ, a, b))
+    return integral
+
+def log_likelihood(params, data):
+    """Логарифмическое правдоподобие"""
+    γ, a, b = params
+    if γ <= 1e-10 or a <= 1e-10 or b <= 1e-10:
+        return -1e10
+    total = 0.0
+    for z in data:
+        if z <= 0:
+            continue
+        log_pdf = km_log_pdf(z, γ, a, b)
+        total += log_pdf
+    return total
+
+def km_fit(data, initial_params = [2, 1, 1]):
+    data = data / data.mean()
+    result = minimize(
+        lambda params: -log_likelihood(params, data),
+        initial_params,
+        method='L-BFGS-B',
+        bounds=[(1e-10, None), (1e-10, None), (1e-10, None)],
+        options={'maxiter': 10000, 'ftol': 1e-12}
+    )
+    return result.x
+
+# Функции для расчета моментов распределения Крицкого-Менкеля
+def km_mean(γ, a, b):
+    """Математическое ожидание распределения Крицкого-Менкеля"""
+    def integrand(k):
+        return k * km_pdf(k, γ, a, b)
+    
+    result, error = quad(integrand, 1e-10, a * 100)  # Ограничиваем верхнюю границу
+    return result
+
+def km_variance(γ, a, b):
+    """Дисперсия распределения Крицкого-Менкеля"""
+    def second_moment_integrand(k):
+        return k**2 * km_pdf(k, γ, a, b)
+    
+    E_X2, _ = quad(second_moment_integrand, 1e-10, a * 100)
+    E_X = km_mean(γ, a, b)
+    return E_X2 - E_X**2
+
+def km_std(γ, a, b):
+    """Среднеквадратическое отклонение"""
+    return math.sqrt(km_variance(γ, a, b))
+
+def km_coefficient_of_variation(γ, a, b):
+    """Коэффициент вариации"""
+    μ = km_mean(γ, a, b)
+    σ = km_std(γ, a, b)
+    return σ / μ
+
+def km_coefficient_of_skewness(γ, a, b):
+    """Коэффициент асимметрии"""
+    μ = km_mean(γ, a, b)
+    σ = km_std(γ, a, b)
+    
+    def third_central_moment_integrand(k):
+        return (k - μ)**3 * km_pdf(k, γ, a, b)
+    
+    E_X_minus_μ_cubed, _ = quad(third_central_moment_integrand, 1e-10, a * 100)
+    return E_X_minus_μ_cubed / (σ**3)
+
 uploaded_file = st.file_uploader("Загрузите Excel файл", type=['xls', 'xlsx'])
 if uploaded_file:
     try:
@@ -104,6 +181,7 @@ if uploaded_file:
             else:
                 data = df[values_col]
             data = pd.DataFrame(data)
+            scaler = data.mean()
             data = data.sort_values(by=values_col)
             data['Ранг'] = range(len(data))
             data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 2)
@@ -153,18 +231,18 @@ if uploaded_file:
                     return self._display_name
            
             # Адаптер для кастомных распределений
-            # class CustomDistributionAdapter(DistributionAdapter):
-            #     def __init__(self, fit_func, ppf_func, display_name):
-            #         self._fit_func = fit_func
-            #         self._ppf_func = ppf_func
-            #         self._display_name = display_name
-            #     def fit(self, data):
-            #         return self._fit_func(data)
-            #     def ppf(self, x, *params):
-            #         return self._ppf_func(x, *params)
-            #     @property
-            #     def name(self):
-            #         return self._display_name
+            class CustomDistributionAdapter(DistributionAdapter):
+                def __init__(self, fit_func, ppf_func, display_name):
+                    self._fit_func = fit_func
+                    self._ppf_func = ppf_func
+                    self._display_name = display_name
+                def fit(self, data):
+                    return self._fit_func(data)
+                def ppf(self, x, *params):
+                    return self._ppf_func(x, *params)
+                @property
+                def name(self):
+                    return self._display_name
            
             # Фабрика для удобного создания распределений
             class DistributionFactory:
@@ -174,54 +252,27 @@ if uploaded_file:
                 @staticmethod
                 def lmoments(lmoments_name, display_name):
                     return LMomentsDistributionAdapter(lmoments_name, display_name)
-                # @staticmethod
-                # def custom(fit_func, ppf_func, display_name):
-                #     return CustomDistributionAdapter(fit_func, ppf_func, display_name)
+                @staticmethod
+                def custom(fit_func, ppf_func, display_name):
+                    return CustomDistributionAdapter(fit_func, ppf_func, display_name)
 
-            # def km_pdf(k, γ, a, b):
-            #     return γ**γ / (a**(γ/b) * math.gamma(γ) * b) * math.exp(-γ*(k/a)**(1/b)) * k**(γ/b-1)
-           
-            # def km_log_pdf(k, γ, a, b):
-            #     return γ * math.log(γ) - (γ/b)*math.log(a) - math.log(math.gamma(γ)) - math.log(b) - γ*(k/a)**(1/b) + (γ/b-1)*math.log(k)
-           
-            # def km_cdf(k, γ, a, b):
-            #     integral, error = quad(km_pdf, 1e-10, k, args=(γ, a, b))
-            #     return integral
-           
-            # def km_ppf(p, γ, a, b, bracket=[1e-10, 10]):
-            #     def equation(x):
-            #         return km_cdf(x, γ, a, b) - p
-            #     sol = root_scalar(equation, bracket=bracket, method='brentq')
-            #     return (sol.root)
-           
-            # def log_likelihood(params, data):
-            #     """Логарифмическое правдоподобие"""
-            #     γ, a, b = params
-            #     if γ <= 1e-10 or a <= 1e-10 or b <= 1e-10:
-            #         return -1e10
-            #     total = 0.0
-            #     for z in data:
-            #         if z <= 0:
-            #             continue
-            #         log_pdf = km_log_pdf(z, γ, a, b)
-            #         total += log_pdf
-            #     return total
-           
-            # def km_fit(data, initial_params = [2, 1, 1]):
-            #     result = minimize(
-            #        lambda params: -log_likelihood(params, data),
-            #        initial_params,
-            #        method='L-BFGS-B',
-            #        bounds=[(1e-10, None), (1e-10, None), (1e-10, None)],
-            #        options={'maxiter': 10000, 'ftol': 1e-12}
-            #    )
-            #     return result.x
+            # Функция PPF для Крицкого-Менкеля (нужна для адаптера)
+            def km_ppf(x, γ, a, b):
+                """Квантильная функция распределения Крицкого-Менкеля"""
+                from scipy.optimize import brentq
+                
+                def equation(k):
+                    return km_cdf(k, γ, a, b) - x
+                
+                # Ищем корень на разумном интервале
+                sol = brentq(equation, 1e-10, a * 100)
+                return sol * scaler.iloc[0]  # Возвращаем в исходный масштаб
 
             distributions = {
                 'Гумбеля (ММП)': DistributionFactory.scipy('gumbel_r', 'Гумбеля (ММП)'),
-                'Фреше (ММП)': DistributionFactory.scipy('invweibull', 'Фреше (ММП)'),
                 'Пирсона 3 типа (ММП)': DistributionFactory.scipy('pearson3', 'Пирсона 3 типа (ММП)'),
                 'Обобщенное (ММП)': DistributionFactory.scipy('genextreme', 'Обобщенное (ММП)'),
+                'Крицкого-Менкеля (ММП)': DistributionFactory.custom(km_fit, km_ppf, 'Крицкого-Менкеля (ММП)'),
                 'Гумбеля (L-мом)': DistributionFactory.lmoments('gum', 'Гумбеля (L-мом)'),
                 'Пирсона 3 типа (L-мом)': DistributionFactory.lmoments('pe3', 'Пирсона 3 типа (L-мом)'),
                 'Обобщенное (L-мом)': DistributionFactory.lmoments('gev', 'Обобщенное (L-мом)')
@@ -329,6 +380,18 @@ if uploaded_file:
                         std = dist.std()
                         cv = format_stat(std/mean)
                         cs = format_stat(dist.stats(moments='s'))
+                    except Exception as e:
+                        st.warning(f"Ошибка при расчете статистик для {distribution}: {str(e)}")
+                        mean = "Ошибка"
+                        cv = "Ошибка"
+                        cs = "Ошибка"
+                # Для кастомного распределения Крицкого-Менкеля
+                elif isinstance(selected_dist, CustomDistributionAdapter) and 'Крицкого-Менкеля' in distribution:
+                    try:
+                        γ, a, b = params
+                        mean = km_mean(γ, a, b) * scaler.iloc[0]  # Возвращаем в исходный масштаб
+                        cv = format_stat(km_coefficient_of_variation(γ, a, b))
+                        cs = format_stat(km_coefficient_of_skewness(γ, a, b))
                     except Exception as e:
                         st.warning(f"Ошибка при расчете статистик для {distribution}: {str(e)}")
                         mean = "Ошибка"
