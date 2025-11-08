@@ -15,12 +15,29 @@ from scipy.optimize import minimize
 from scipy.integrate import quad
 import math
 
-# Устанавливаем anderson-darling если нужно
-try:
-    from anderson_darling import anderson_darling
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "anderson-darling"])
-    from anderson_darling import anderson_darling
+# Простая функция Anderson-Darling теста для сравнения распределений
+def anderson_darling_test(data, cdf_func):
+    """
+    Anderson-Darling тест для сравнения распределений
+    data: эмпирические данные
+    cdf_func: функция распределения F(x)
+    возвращает: A-D статистику (чем меньше, тем лучше)
+    """
+    n = len(data)
+    sorted_data = np.sort(data)
+    
+    # Вычисляем F(X_i)
+    cdf_values = np.array([cdf_func(x) for x in sorted_data])
+    
+    # Избегаем log(0) и log(1)
+    cdf_values = np.clip(cdf_values, 1e-12, 1 - 1e-12)
+    
+    # Статистика Anderson-Darling
+    i = np.arange(1, n + 1)
+    term = (2 * i - 1) * (np.log(cdf_values) + np.log(1 - cdf_values[::-1]))
+    A2 = -n - (1/n) * np.sum(term)
+    
+    return A2
 
 ru_dict = {'page_title': "Кривые обеспеченности",
            'title': "📉 Кривые обеспеченности"}
@@ -363,7 +380,6 @@ if uploaded_file:
                         # Для кастомных распределений создаем обертку для CDF
                         def cdf_func(x):
                             # Для кастомных распределений нам нужно вычислить CDF вручную
-                            # Для простоты используем численное интегрирование PDF
                             if 'Крицкого-Менкеля' in distribution:
                                 # Для Крицкого-Менкеля используем нашу функцию km_cdf
                                 return km_cdf(x / scaler.iloc[0], *params)  # Нормализуем данные
@@ -371,7 +387,7 @@ if uploaded_file:
                                 # Для других кастомных распределений можно добавить аналогично
                                 return np.nan
                     
-                    ad_stat = anderson_darling(data[values_col].values, cdf_func)
+                    ad_stat = anderson_darling_test(data[values_col].values, cdf_func)
                     
                 except Exception as e:
                     st.warning(f"Не удалось рассчитать A-D статистику для {distribution}: {str(e)}")
@@ -613,7 +629,7 @@ if uploaded_file:
                             <br>
                             &nbsp;&nbsp;&nbsp;&nbsp;• <b>maxE</b> - максимальная абсолютная ошибка (максимальное отклонение предсказаний от эмпирических данных)
                             <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>A-D</b> - критерий согласия Андерсона-Дарлинга (чем меньше, тем лучше соответствие распределения данным)
+                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>A-D</b> - Критерий согласия Андерсона-Дарлинга (чем меньше, тем лучше соответствие распределения данным)
                             """, unsafe_allow_html=True)
 
     except Exception as e:
