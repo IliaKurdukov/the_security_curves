@@ -15,6 +15,13 @@ from scipy.optimize import minimize
 from scipy.integrate import quad
 import math
 
+# Устанавливаем anderson-darling если нужно
+try:
+    from anderson_darling import anderson_darling
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "anderson-darling"])
+    from anderson_darling import anderson_darling
+
 ru_dict = {'page_title': "Кривые обеспеченности",
            'title': "📉 Кривые обеспеченности"}
            
@@ -305,13 +312,13 @@ if uploaded_file:
             df_1 = pd.DataFrame(percent_list_1, columns=['Обеспеченность'])
 
             # таблица характеристик
-            parameters = ['Среднее', 'Cv', 'Cs', 'R²', 'MAE', 'maxE']
+            parameters = ['Среднее', 'Cv', 'Cs', 'R²', 'MAE', 'maxE', 'A-D']
             parameters_df = pd.DataFrame(parameters, columns=['Распределение'])
             mean = data[values_col].mean()
             std = data[values_col].std()
             cv = (std/mean)
             cs = (stats.skew(data[values_col]))
-            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-', '-'])
+            parameters_df['Эмпирическое'] = pd.DataFrame([mean, cv, cs, '-', '-', '-', '-'])
 
             # Функция для округления метрик
             def custom_round(x):
@@ -336,6 +343,39 @@ if uploaded_file:
                 r2 = r2_score(data[values_col], predict)
                 mae = mean_absolute_error(data[values_col], predict)
                 maxE = max_error(data[values_col], predict)
+                
+                # Расчет A-D статистики
+                try:
+                    # Создаем CDF функцию для подобранного распределения
+                    if isinstance(selected_dist, ScipyDistributionAdapter):
+                        fitted_dist = selected_dist._dist(*params)
+                        cdf_func = fitted_dist.cdf
+                    elif isinstance(selected_dist, LMomentsDistributionAdapter):
+                        # Для L-moments создаем соответствующее scipy распределение
+                        if selected_dist._lmoments_name == 'gum':
+                            fitted_dist = stats.gumbel_r(loc=params[0], scale=params[1])
+                        elif selected_dist._lmoments_name == 'pe3':
+                            fitted_dist = stats.pearson3(skew=params[0], loc=params[1], scale=params[2])
+                        elif selected_dist._lmoments_name == 'gev':
+                            fitted_dist = stats.genextreme(c=params[0], loc=params[1], scale=params[2])
+                        cdf_func = fitted_dist.cdf
+                    elif isinstance(selected_dist, CustomDistributionAdapter):
+                        # Для кастомных распределений создаем обертку для CDF
+                        def cdf_func(x):
+                            # Для кастомных распределений нам нужно вычислить CDF вручную
+                            # Для простоты используем численное интегрирование PDF
+                            if 'Крицкого-Менкеля' in distribution:
+                                # Для Крицкого-Менкеля используем нашу функцию km_cdf
+                                return km_cdf(x / scaler.iloc[0], *params)  # Нормализуем данные
+                            else:
+                                # Для других кастомных распределений можно добавить аналогично
+                                return np.nan
+                    
+                    ad_stat = anderson_darling(data[values_col].values, cdf_func)
+                    
+                except Exception as e:
+                    st.warning(f"Не удалось рассчитать A-D статистику для {distribution}: {str(e)}")
+                    ad_stat = np.nan
 
                 def f(x):
                     return selected_dist.ppf(1-x/100, *params)
@@ -398,7 +438,7 @@ if uploaded_file:
                         cv = "Ошибка"
                         cs = "Ошибка"
                 
-                parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae, maxE])
+                parameters_df[f'{teor_label}'] = pd.DataFrame([mean, cv, cs, r2, mae, maxE, ad_stat])
 
             # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
             # границ, шага и подписей делений для горизонтальной оси
@@ -517,9 +557,9 @@ if uploaded_file:
                             return colors
                         return [''] * len(col)
                     
-                    # Функция для 5, 6 столбца (чем меньше значение, тем ярче)
-                    def style_fifth_sixth(col):
-                        if col.name in df.columns[4:6]:  # Исправлено: проверяем вхождение в срез
+                    # Функция для 5, 6, 7 столбца (чем меньше значение, тем ярче)
+                    def style_fifth_sixth_seventh(col):
+                        if col.name in df.columns[4:7]:  # MAE, maxE, A-D
                             colors = [''] * len(col)
                             numeric_values = []
                             
@@ -544,7 +584,7 @@ if uploaded_file:
                     # Применяем стили ко всем столбцам
                     styler = styler.apply(style_first_three, axis=0)
                     styler = styler.apply(style_fourth, axis=0)
-                    styler = styler.apply(style_fifth_sixth, axis=0)
+                    styler = styler.apply(style_fifth_sixth_seventh, axis=0)
                     
                     return styler
                 
@@ -572,6 +612,8 @@ if uploaded_file:
                             &nbsp;&nbsp;&nbsp;&nbsp;• <b>MAE</b> - средняя абсолютная ошибка (среднее отклонение предсказаний от эмпирических данных)
                             <br>
                             &nbsp;&nbsp;&nbsp;&nbsp;• <b>maxE</b> - максимальная абсолютная ошибка (максимальное отклонение предсказаний от эмпирических данных)
+                            <br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>A-D</b> - критерий согласия Андерсона-Дарлинга (чем меньше, тем лучше соответствие распределения данным)
                             """, unsafe_allow_html=True)
 
     except Exception as e:
