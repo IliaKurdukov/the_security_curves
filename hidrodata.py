@@ -235,10 +235,7 @@ if uploaded_file:
 
                  x = data[index_col] * 100
                  y = data[values_col]
-                 plt.bar(x, y,
-                             label='Эмпирическое',
-                             edgecolors='black', # черный контур
-                             linewidths=0.5)    # толщина контура
+                 plt.bar(x, y)
                  # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
                  # границ, шага и подписей делений для горизонтальной оси
                  ax.xaxis.grid(True)
