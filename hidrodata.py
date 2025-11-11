@@ -216,7 +216,7 @@ if uploaded_file:
                 if index_col != 'Без группировки':
                     data[index_col] = data.index
                 data_to_merge = data.sort_values(by=values_col, ascending = False)
-                data_to_merge.drop(['Вероятность', ''Обеспеченность P, %', 'Ранг'], axis=1, inplace=True)
+                data_to_merge.drop(['Вероятность', 'Обеспеченность P, %', 'Ранг'], axis=1, inplace=True)
                 data_to_merge.rename(columns={values_col: values_col + ' (P)'}, inplace=True)
                 if index_col != 'Без группировки':
                     data_to_merge.rename(columns={index_col: index_col + ' (P)'}, inplace=True)
