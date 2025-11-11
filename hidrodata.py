@@ -232,10 +232,9 @@ if uploaded_file:
                 
             with st.expander("# 📊 График хода значений", expanded=False):
                  fig, ax = plt.subplots(figsize=(4, 2))
-
-                 x = data[index_col] * 100
+                 x = data[index_col] if index_col != 'Без группировки' else data.index
                  y = data[values_col]
-                 plt.plot(x, y)
+                 plt.plot(x, y, linewidth=0.5)
                  ax.set_ylabel(values_col, fontsize=5)       
                  ax.set_title(f"График хода значений", fontsize=6)
                  ax.tick_params(axis='x', labelsize=5)
