@@ -235,10 +235,7 @@ if uploaded_file:
 
                  x = data[index_col] * 100
                  y = data[values_col]
-                 plt.bar(x, y)
-                 # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
-                 # границ, шага и подписей делений для горизонтальной оси
-                 ax.xaxis.grid(True)
+                 plt.plot(x, y)
                  ax.set_ylabel(values_col, fontsize=5)       
                  ax.set_title(f"График хода значений", fontsize=6)
                  ax.tick_params(axis='x', labelsize=5)
