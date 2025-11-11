@@ -229,7 +229,28 @@ if uploaded_file:
                     st.markdown(data[[index_col, values_col, 'Обеспеченность P, %', values_col + ' (P)', index_col + ' (P)']].to_html(), unsafe_allow_html=True)
                 else:
                     st.markdown(data[[values_col, 'Обеспеченность P, %', values_col + ' (P)']].to_html(), unsafe_allow_html=True)
-                data = data.sort_values(by=values_col)
+                
+            with st.expander("# 📊 График хода значений", expanded=False):
+                 fig, ax = plt.subplots(figsize=(4, 2))
+
+                 x = data[index_col] * 100
+                 y = data[values_col]
+                 plt.bar(x, y,
+                             label='Эмпирическое',
+                             s=5,           # размер точек
+                             facecolors='none', # без заливки
+                             edgecolors='black', # черный контур
+                             linewidths=0.5)    # толщина контура
+                 # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
+                 # границ, шага и подписей делений для горизонтальной оси
+                 ax.xaxis.grid(True)
+                 ax.set_ylabel(values_col, fontsize=5)       
+                 ax.set_title(f"График хода значений", fontsize=6)
+                 ax.tick_params(axis='x', labelsize=5)
+                 ax.tick_params(axis='y', labelsize=5)
+                 st.pyplot(fig, use_container_width=False)
+
+            data = data.sort_values(by=values_col)
 
             # Базовый интерфейс для всех распределений
             class DistributionAdapter(ABC):
