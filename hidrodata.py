@@ -216,15 +216,15 @@ if uploaded_file:
                 if index_col != 'Без группировки':
                     data[index_col] = data.index
                 data_to_merge = data.sort_values(by=values_col, ascending = False)
-                data_to_merge['Ранг'] = data['Ранг']
+                data_to_merge.drop(['Вероятность', 'Вероятность (P)'], axis=1, inplace=True)
+                data_to_merge.rename(columns={values_col: values_col + ' (P)'}, inplace=True)
                 if index_col != 'Без группировки':
+                    data_to_merge.rename(columns={index_col: index_col + ' (P)'}, inplace=True)
                     data_to_merge[index_col + ' (P)'] = data_to_merge.index
+                data_to_merge['Ранг'] = data['Ранг']
                 data = data.merge(data_to_merge, on = 'Ранг')
                 data.set_index('Ранг', inplace=True)
-                # if index_col != 'Без группировки':
-                #     data.insert(0, index_col, data[index_col])
-                #     data = data.drop(index_col, axis=1)
-                st.markdown(data.to_html(), unsafe_allow_html=True)
+                st.markdown(data[[index_col, values_col, 'Вероятность (P)', values_col + ' (P)', index_col + ' (P)']].to_html(), unsafe_allow_html=True)
                 data = data.sort_values(by=values_col)
 
             # Базовый интерфейс для всех распределений
