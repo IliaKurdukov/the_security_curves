@@ -211,8 +211,8 @@ if uploaded_file:
                 scaler = data.mean()
                 data['Ранг'] = range(len(data))
                 data['Ранг'] = data['Ранг'] + 1
-                data['Вероятность'] = 1 - (data['Ранг']) / (data['Ранг'].max() + 1)
-                data['Обеспеченность P, %'] = round(100 - data['Вероятность'] * 100, 2)
+                data['Вероятность'] = (data['Ранг']) / (data['Ранг'].max() + 1)
+                data['Обеспеченность P, %'] = round(data['Вероятность'] * 100, 2)
                 if index_col != 'Без группировки':
                     data[index_col] = data.index
                 data_to_merge = data.sort_values(by=values_col, ascending = False)
