@@ -198,33 +198,34 @@ if uploaded_file:
             values_col = st.selectbox("Выберите столбец с данными для построения кривой обеспеченности", numeric_cols)
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
+            if index_col != 'Без группировки':
+                aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
 
             with st.expander("# 🔢 Хронологический ряд значений и эмпирическое распределение", expanded=False):
                 if index_col != 'Без группировки':
-                    aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
                     aggfunc_dict = {'Максимальные значения': 'max', 'Средние значения': 'mean', 'Минимальные значения': 'min'}
                     data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
                 else:
                     data = df[values_col]
                 data = pd.DataFrame(data)
                 scaler = data.mean()
-                data = data.sort_values(by=values_col)
                 data['Ранг'] = range(len(data))
                 data['Ранг'] = data['Ранг'] + 1
                 data['Вероятность'] = 1 - (data['Ранг']) / (data['Ранг'].max() + 1)
+                data['Вероятность (P)'] = round(100 - data['Вероятность'] * 100, 2)
                 if index_col != 'Без группировки':
-                    data['index_col'] = data.index
+                    data[index_col] = data.index
                 data_to_merge = data.sort_values(by=values_col, ascending = False)
                 data_to_merge['Ранг'] = data['Ранг']
                 if index_col != 'Без группировки':
-                    data_to_merge['index_col'] = data_to_merge.index
+                    data_to_merge[index_col + ' (P)'] = data_to_merge.index
                 # data = data.merge(data_to_merge, on = 'Ранг')
                 data.set_index('Ранг', inplace=True)
-                
-                # data.insert(0, 'year', max_snow_df['year_x'])
-                # max_snow_df = max_snow_df.drop('year_x', axis=1)
-                # round(max_snow_df,2)
+                if index_col != 'Без группировки':
+                    data.insert(0, index_col, data[index_col])
+                    data = data.drop(index_col, axis=1)
                 st.markdown(data.to_html(), unsafe_allow_html=True)
+                data = data.sort_values(by=values_col)
 
             # Базовый интерфейс для всех распределений
             class DistributionAdapter(ABC):
