@@ -335,7 +335,7 @@ if uploaded_file:
             fig, ax = plt.subplots(figsize=(4, 2))
 
             x = data['Вероятность'] * 100
-            y = data[values_col]
+            y = data[values_col + ' (P)']
             plt.scatter(x, y,
                         label='Эмпирическое',
                         s=5,           # размер точек
