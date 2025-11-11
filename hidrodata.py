@@ -216,7 +216,7 @@ if uploaded_file:
                 if index_col != 'Без группировки':
                     data[index_col] = data.index
                 data_to_merge = data.sort_values(by=values_col, ascending = False)
-                data_to_merge.drop(['Вероятность', 'Вероятность (P)', 'Ранг'], axis=1, inplace=True)
+                data_to_merge.drop(['Вероятность', ''Обеспеченность P, %', 'Ранг'], axis=1, inplace=True)
                 data_to_merge.rename(columns={values_col: values_col + ' (P)'}, inplace=True)
                 if index_col != 'Без группировки':
                     data_to_merge.rename(columns={index_col: index_col + ' (P)'}, inplace=True)
@@ -226,10 +226,10 @@ if uploaded_file:
                 # data = pd.concat([data, data_to_merge], axis=1, ignore_index=True)
                 data.set_index('Ранг', inplace=True)
                 if index_col != 'Без группировки':
-                    # st.markdown(data[[index_col, values_col, 'Вероятность (P)', values_col + ' (P)', index_col + ' (P)']].to_html(), unsafe_allow_html=True)
+                    # st.markdown(data[[index_col, values_col, ''Обеспеченность P, %', values_col + ' (P)', index_col + ' (P)']].to_html(), unsafe_allow_html=True)
                     st.markdown(data_to_merge.to_html(), unsafe_allow_html=True)
                 else:
-                    st.markdown(data[[values_col, 'Вероятность (P)', values_col + ' (P)']].to_html(), unsafe_allow_html=True)
+                    st.markdown(data[[values_col, ''Обеспеченность P, %', values_col + ' (P)']].to_html(), unsafe_allow_html=True)
                 data = data.sort_values(by=values_col)
 
             # Базовый интерфейс для всех распределений
