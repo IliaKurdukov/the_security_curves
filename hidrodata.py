@@ -237,8 +237,6 @@ if uploaded_file:
                  y = data[values_col]
                  plt.bar(x, y,
                              label='Эмпирическое',
-                             s=5,           # размер точек
-                             facecolors='none', # без заливки
                              edgecolors='black', # черный контур
                              linewidths=0.5)    # толщина контура
                  # добавление линий сетки, масштаба по горизонтальной оси, подписей осей и графика,
