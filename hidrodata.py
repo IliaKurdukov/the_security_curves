@@ -218,7 +218,7 @@ if uploaded_file:
                 data_to_merge['Ранг'] = data['Ранг']
                 if index_col != 'Без группировки':
                     data_to_merge['index_col'] = data_to_merge.index
-                data = data.merge(data_to_merge, on = 'Ранг')
+                # data = data.merge(data_to_merge, on = 'Ранг')
                 data.set_index('Ранг', inplace=True)
                 
                 # data.insert(0, 'year', max_snow_df['year_x'])
