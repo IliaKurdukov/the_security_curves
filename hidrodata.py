@@ -198,17 +198,33 @@ if uploaded_file:
             values_col = st.selectbox("Выберите столбец с данными для построения кривой обеспеченности", numeric_cols)
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
-            if index_col != 'Без группировки':
-                aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
-                aggfunc_dict = {'Максимальные значения': 'max', 'Средние значения': 'mean', 'Минимальные значения': 'min'}
-                data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
-            else:
-                data = df[values_col]
-            data = pd.DataFrame(data)
-            scaler = data.mean()
-            data = data.sort_values(by=values_col)
-            data['Ранг'] = range(len(data))
-            data['Вероятность'] = 1 - (data['Ранг'] + 1) / (data['Ранг'].max() + 2)
+
+            with st.expander("# 🔢 Хронологический ряд значений и эмпирическое распределение", expanded=False):
+                if index_col != 'Без группировки':
+                    aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
+                    aggfunc_dict = {'Максимальные значения': 'max', 'Средние значения': 'mean', 'Минимальные значения': 'min'}
+                    data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
+                else:
+                    data = df[values_col]
+                data = pd.DataFrame(data)
+                scaler = data.mean()
+                data = data.sort_values(by=values_col)
+                data['Ранг'] = range(len(data))
+                data['Ранг'] = data['Ранг'] + 1
+                data['Вероятность'] = 1 - (data['Ранг']) / (data['Ранг'].max() + 1)
+                if index_col != 'Без группировки':
+                    data['index_col'] = data.index
+                data_to_merge = data.sort_values(by=values_col, ascending = False)
+                data_to_merge['Ранг'] = data['Ранг']
+                if index_col != 'Без группировки':
+                    data_to_merge['index_col'] = data_to_merge.index
+                data = data.merge(data_to_merge, on = 'Ранг')
+                data.set_index('Ранг', inplace=True)
+                
+                # data.insert(0, 'year', max_snow_df['year_x'])
+                # max_snow_df = max_snow_df.drop('year_x', axis=1)
+                round(max_snow_df,2)
+                st.markdown(data.to_html(), unsafe_allow_html=True)
 
             # Базовый интерфейс для всех распределений
             class DistributionAdapter(ABC):
@@ -284,14 +300,12 @@ if uploaded_file:
             def km_ppf(x, γ, a, b):
                 """Квантильная функция распределения Крицкого-Менкеля"""
                 from scipy.optimize import brentq
-                
                 def equation(k):
                     return km_cdf(k, γ, a, b) - x
-                
                 # Ищем корень на разумном интервале
                 sol = brentq(equation, 1e-10, a * 100)
                 return sol * scaler.iloc[0]  # Возвращаем в исходный масштаб
-
+            
             distributions = {
                 'Гумбеля (ММП)': DistributionFactory.scipy('gumbel_r', 'Гумбеля (ММП)'),
                 'Пирсона 3 типа (ММП)': DistributionFactory.scipy('pearson3', 'Пирсона 3 типа (ММП)'),
