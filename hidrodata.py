@@ -223,7 +223,7 @@ if uploaded_file:
                 
                 # data.insert(0, 'year', max_snow_df['year_x'])
                 # max_snow_df = max_snow_df.drop('year_x', axis=1)
-                round(max_snow_df,2)
+                # round(max_snow_df,2)
                 st.markdown(data.to_html(), unsafe_allow_html=True)
 
             # Базовый интерфейс для всех распределений
