@@ -224,7 +224,7 @@ if uploaded_file:
                 data_to_merge['Ранг'] = data['Ранг']
                 # data = data.merge(data_to_merge, on = 'Ранг')
                 data = pd.concat([data, data_to_merge], axis=1, ignore_index=True)
-                data.set_index('Ранг', inplace=True)
+                # data.set_index('Ранг', inplace=True)
                 if index_col != 'Без группировки':
                     st.markdown(data[[index_col, values_col, 'Вероятность (P)', values_col + ' (P)', index_col + ' (P)']].to_html(), unsafe_allow_html=True)
                 else:
