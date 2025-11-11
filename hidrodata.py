@@ -219,11 +219,11 @@ if uploaded_file:
                 data_to_merge['Ранг'] = data['Ранг']
                 if index_col != 'Без группировки':
                     data_to_merge[index_col + ' (P)'] = data_to_merge.index
-                # data = data.merge(data_to_merge, on = 'Ранг')
+                data = data.merge(data_to_merge, on = 'Ранг')
                 data.set_index('Ранг', inplace=True)
-                if index_col != 'Без группировки':
-                    data.insert(0, index_col, data[index_col])
-                    data = data.drop(index_col, axis=1)
+                # if index_col != 'Без группировки':
+                #     data.insert(0, index_col, data[index_col])
+                #     data = data.drop(index_col, axis=1)
                 st.markdown(data.to_html(), unsafe_allow_html=True)
                 data = data.sort_values(by=values_col)
 
