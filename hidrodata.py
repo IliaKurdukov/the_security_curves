@@ -212,7 +212,7 @@ if uploaded_file:
                 data['Ранг'] = range(len(data))
                 data['Ранг'] = data['Ранг'] + 1
                 data['Вероятность'] = 1 - (data['Ранг']) / (data['Ранг'].max() + 1)
-                data['Вероятность (P)'] = round(100 - data['Вероятность'] * 100, 2)
+                data['Обеспеченность P, %'] = round(100 - data['Вероятность'] * 100, 2)
                 if index_col != 'Без группировки':
                     data[index_col] = data.index
                 data_to_merge = data.sort_values(by=values_col, ascending = False)
@@ -226,7 +226,8 @@ if uploaded_file:
                 # data = pd.concat([data, data_to_merge], axis=1, ignore_index=True)
                 data.set_index('Ранг', inplace=True)
                 if index_col != 'Без группировки':
-                    st.markdown(data[[index_col, values_col, 'Вероятность (P)', values_col + ' (P)', index_col + ' (P)']].to_html(), unsafe_allow_html=True)
+                    # st.markdown(data[[index_col, values_col, 'Вероятность (P)', values_col + ' (P)', index_col + ' (P)']].to_html(), unsafe_allow_html=True)
+                    st.markdown(data_to_merge.to_html(), unsafe_allow_html=True)
                 else:
                     st.markdown(data[[values_col, 'Вероятность (P)', values_col + ' (P)']].to_html(), unsafe_allow_html=True)
                 data = data.sort_values(by=values_col)
