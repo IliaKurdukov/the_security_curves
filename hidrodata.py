@@ -196,11 +196,13 @@ if uploaded_file:
             st.stop()
         else:
             values_col = st.selectbox("Выберите столбец с данными для построения кривой обеспеченности", numeric_cols)
+            df.rename(columns={values_col: str(values_col)}, inplace=True)
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
             if index_col != 'Без группировки':
                 aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
-
+                df.rename(columns={index_col: str(index_col)}, inplace=True)
+            
             with st.expander("# 🔢 Хронологический ряд значений и эмпирическое распределение", expanded=False):
                 if index_col != 'Без группировки':
                     aggfunc_dict = {'Максимальные значения': 'max', 'Средние значения': 'mean', 'Минимальные значения': 'min'}
@@ -427,7 +429,12 @@ if uploaded_file:
                 def f(x):
                     return selected_dist.ppf(1-x/100, *params)
                 f2 = np.vectorize(f)
-                x_teor = np.arange(0.1, 99.9, 0.2)
+                range1 = np.arange(0.1, 1.1, 0.2)
+                range2 = np.arange(1.1, 2.0, 0.3)      
+                range3 = np.arange(2.0, 98.0, 1.0)     
+                range4 = np.arange(98.0, 98.9, 0.3)   
+                range5 = np.arange(98.9, 99.9, 0.2)   
+                x_teor = np.concatenate([range1, range2, range3, range4, range5])
                 teor_label = distribution
                 plt.plot(x_teor, f2(x_teor), label= f'{teor_label}', linewidth=0.7)
 
