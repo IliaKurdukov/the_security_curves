@@ -673,3 +673,4 @@ if uploaded_file:
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
 
+
