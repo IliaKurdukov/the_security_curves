@@ -440,7 +440,8 @@ if uploaded_file:
             range3 = np.arange(2.0, 98.0, 1.0)     
             range4 = np.arange(98.0, 98.9, 0.3)   
             range5 = np.arange(98.9, 99.9, 0.2)   
-            x_teor = np.concatenate([range1, range2, range3, range4, range5])
+            # Добавляем 99.9 явно, чтобы график доходил до конца
+            x_teor = np.concatenate([range1, range2, range3, range4, range5, [99.9]])
             
             # построение кривой с распределением
             for distribution in distributions_to_plot:
