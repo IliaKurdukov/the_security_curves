@@ -11,9 +11,11 @@ from abc import ABC, abstractmethod
 from sklearn.metrics import mean_absolute_error, r2_score, max_error
 import lmoments3 as lm
 from lmoments3 import distr
-from scipy.optimize import minimize
+from scipy.optimize import minimize, brentq
 from scipy.integrate import quad
 import math
+from math import pi
+from sympy import EulerGamma
 
 # Простая функция Anderson-Darling теста для сравнения распределений
 def anderson_darling_test(data, cdf_func):
@@ -26,8 +28,8 @@ def anderson_darling_test(data, cdf_func):
     n = len(data)
     sorted_data = np.sort(data)
     
-    # Вычисляем F(X_i)
-    cdf_values = np.array([cdf_func(x) for x in sorted_data])
+    # Оптимизация: векторизуем вычисление CDF значений
+    cdf_values = np.vectorize(cdf_func)(sorted_data)
     
     # Избегаем log(0) и log(1)
     cdf_values = np.clip(cdf_values, 1e-12, 1 - 1e-12)
@@ -211,9 +213,11 @@ if uploaded_file:
                     data = df[values_col]
                 data = pd.DataFrame(data)
                 scaler = data.mean()
-                data['Ранг'] = range(len(data))
-                data['Ранг'] = data['Ранг'] + 1
-                data['Вероятность'] = (data['Ранг']) / (data['Ранг'].max() + 1)
+                n = len(data)
+                # Оптимизация: создаем ранг сразу с правильными значениями
+                data['Ранг'] = np.arange(1, n + 1)
+                max_rank_plus_one = n + 1
+                data['Вероятность'] = data['Ранг'] / max_rank_plus_one
                 data['Обеспеченность P, %'] = round(data['Вероятность'] * 100, 2)
                 if index_col != 'Без группировки':
                     data[index_col] = data.index
@@ -223,8 +227,8 @@ if uploaded_file:
                 if index_col != 'Без группировки':
                     data_to_merge.rename(columns={index_col: index_col + ' (P)'}, inplace=True)
                     data_to_merge[index_col + ' (P)'] = data_to_merge.index
-                data_to_merge['Ранг'] = range(len(data))
-                data_to_merge['Ранг'] = data_to_merge['Ранг'] + 1
+                # Оптимизация: создаем ранг сразу с правильными значениями
+                data_to_merge['Ранг'] = np.arange(1, n + 1)
                 data = data.merge(data_to_merge, on = 'Ранг')
                 data.set_index('Ранг', inplace=True)
                 if index_col != 'Без группировки':
@@ -315,21 +319,37 @@ if uploaded_file:
                 def custom(fit_func, ppf_func, display_name):
                     return CustomDistributionAdapter(fit_func, ppf_func, display_name)
 
+            # Сохраняем scaler для использования в km_ppf
+            scaler_value = scaler.iloc[0] if hasattr(scaler, 'iloc') else float(scaler)
+            
             # Функция PPF для Крицкого-Менкеля (нужна для адаптера)
             def km_ppf(x, γ, a, b):
                 """Квантильная функция распределения Крицкого-Менкеля"""
-                from scipy.optimize import brentq
                 def equation(k):
                     return km_cdf(k, γ, a, b) - x
                 # Ищем корень на разумном интервале
                 sol = brentq(equation, 1e-10, a * 100)
-                return sol * scaler.iloc[0]  # Возвращаем в исходный масштаб
+                return sol * scaler_value  # Возвращаем в исходный масштаб
+            
+            # Функции для распределения Гумбеля методом моментов
+            def gumbel_moments_fit(data):
+                """Расчет параметров распределения Гумбеля методом моментов"""
+                mean = np.mean(data)
+                std = np.std(data, ddof=0)  # СКО выборки
+                scale = std * (6**(1/2)) / pi
+                loc = mean - float(EulerGamma) * scale
+                return [loc, scale]
+            
+            def gumbel_moments_ppf(x, loc, scale):
+                """Квантильная функция распределения Гумбеля (использует scipy)"""
+                return stats.gumbel_r.ppf(x, loc=loc, scale=scale)
             
             distributions = {
                 'Гумбеля (ММП)': DistributionFactory.scipy('gumbel_r', 'Гумбеля (ММП)'),
                 'Пирсона 3 типа (ММП)': DistributionFactory.scipy('pearson3', 'Пирсона 3 типа (ММП)'),
                 'Обобщенное (ММП)': DistributionFactory.scipy('genextreme', 'Обобщенное (ММП)'),
                 'Крицкого-Менкеля (ММП)': DistributionFactory.custom(km_fit, km_ppf, 'Крицкого-Менкеля (ММП)'),
+                'Гумбеля (Мом)': DistributionFactory.custom(gumbel_moments_fit, gumbel_moments_ppf, 'Гумбеля (Мом)'),
                 'Гумбеля (L-мом)': DistributionFactory.lmoments('gum', 'Гумбеля (L-мом)'),
                 'Пирсона 3 типа (L-мом)': DistributionFactory.lmoments('pe3', 'Пирсона 3 типа (L-мом)'),
                 'Обобщенное (L-мом)': DistributionFactory.lmoments('gev', 'Обобщенное (L-мом)')
@@ -380,34 +400,76 @@ if uploaded_file:
             
             # Расчет точности для округления остальных чисел в таблице:
             sample = df.loc[0, values_col]
-            if sample == int(sample):
+            if isinstance(sample, (int, np.integer)) or (isinstance(sample, float) and sample.is_integer()):
                 precision = 1
             else:
-                precision = len(str(sample).split('.')[1])
+                # Более эффективный способ определения точности
+                sample_str = str(sample)
+                if '.' in sample_str:
+                    precision = len(sample_str.split('.')[1])
+                else:
+                    precision = 1
 
+            # Вспомогательная функция для создания scipy распределения из L-moments параметров
+            def create_scipy_dist_from_lmoments(lmoments_name, params):
+                """Создает scipy распределение из параметров L-moments"""
+                if lmoments_name == 'gum':
+                    return stats.gumbel_r(loc=params[0], scale=params[1])
+                elif lmoments_name == 'pe3':
+                    return stats.pearson3(skew=params[0], loc=params[1], scale=params[2])
+                elif lmoments_name == 'gev':
+                    return stats.genextreme(c=params[0], loc=params[1], scale=params[2])
+                else:
+                    raise ValueError(f"Неизвестное L-moments распределение: {lmoments_name}")
+            
+            # Вспомогательная функция для форматирования статистики
+            def format_stat(value):
+                """Форматирует статистику: заменяет nan/inf на 'Не существует'."""
+                if np.isnan(value) or np.isinf(value):
+                    return "Не существует"
+                else:
+                    return value
+            
+            # Словари для хранения параметров и распределений (избегаем повторных вычислений)
+            distribution_params = {}
+            distribution_objects = {}  # Для хранения scipy распределений
+            
+            # Оптимизация: создаем x_teor один раз для всех распределений
+            range1 = np.arange(0.1, 1.1, 0.2)
+            range2 = np.arange(1.1, 2.0, 0.3)      
+            range3 = np.arange(2.0, 98.0, 1.0)     
+            range4 = np.arange(98.0, 98.9, 0.3)   
+            range5 = np.arange(98.9, 99.9, 0.2)   
+            x_teor = np.concatenate([range1, range2, range3, range4, range5])
+            
             # построение кривой с распределением
             for distribution in distributions_to_plot:
                 selected_dist = distributions[distribution]
+                # Вычисляем параметры один раз и сохраняем
                 params = selected_dist.fit(data[values_col])
+                distribution_params[distribution] = params
+                
                 predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
                 r2 = r2_score(data[values_col], predict)
                 mae = mean_absolute_error(data[values_col], predict)
                 maxE = max_error(data[values_col], predict)
                 
-                # Расчет A-D статистики
+                # Расчет A-D статистики и сохранение распределения для дальнейшего использования
                 try:
                     # Создаем CDF функцию для подобранного распределения
                     if isinstance(selected_dist, ScipyDistributionAdapter):
                         fitted_dist = selected_dist._dist(*params)
+                        distribution_objects[distribution] = fitted_dist
                         cdf_func = fitted_dist.cdf
                     elif isinstance(selected_dist, LMomentsDistributionAdapter):
                         # Для L-moments создаем соответствующее scipy распределение
-                        if selected_dist._lmoments_name == 'gum':
-                            fitted_dist = stats.gumbel_r(loc=params[0], scale=params[1])
-                        elif selected_dist._lmoments_name == 'pe3':
-                            fitted_dist = stats.pearson3(skew=params[0], loc=params[1], scale=params[2])
-                        elif selected_dist._lmoments_name == 'gev':
-                            fitted_dist = stats.genextreme(c=params[0], loc=params[1], scale=params[2])
+                        fitted_dist = create_scipy_dist_from_lmoments(selected_dist._lmoments_name, params)
+                        distribution_objects[distribution] = fitted_dist
+                        cdf_func = fitted_dist.cdf
+                    elif isinstance(selected_dist, CustomDistributionAdapter) and 'Гумбеля (Мом)' in distribution:
+                        # Для Гумбеля (Мом) создаем scipy распределение для A-D теста
+                        fitted_dist = stats.gumbel_r(loc=params[0], scale=params[1])
+                        distribution_objects[distribution] = fitted_dist
                         cdf_func = fitted_dist.cdf
                     elif isinstance(selected_dist, CustomDistributionAdapter):
                         # Для кастомных распределений создаем обертку для CDF
@@ -415,7 +477,7 @@ if uploaded_file:
                             # Для кастомных распределений нам нужно вычислить CDF вручную
                             if 'Крицкого-Менкеля' in distribution:
                                 # Для Крицкого-Менкеля используем нашу функцию km_cdf
-                                return km_cdf(x / scaler.iloc[0], *params)  # Нормализуем данные
+                                return km_cdf(x / scaler_value, *params)  # Нормализуем данные
                             else:
                                 # Для других кастомных распределений можно добавить аналогично
                                 return np.nan
@@ -426,32 +488,24 @@ if uploaded_file:
                     st.warning(f"Не удалось рассчитать A-D статистику для {distribution}: {str(e)}")
                     ad_stat = np.nan
 
+                # Оптимизация: создаем векторизованную функцию
                 def f(x):
                     return selected_dist.ppf(1-x/100, *params)
                 f2 = np.vectorize(f)
-                range1 = np.arange(0.1, 1.1, 0.2)
-                range2 = np.arange(1.1, 2.0, 0.3)      
-                range3 = np.arange(2.0, 98.0, 1.0)     
-                range4 = np.arange(98.0, 98.9, 0.3)   
-                range5 = np.arange(98.9, 99.9, 0.2)   
-                x_teor = np.concatenate([range1, range2, range3, range4, range5])
                 teor_label = distribution
-                plt.plot(x_teor, f2(x_teor), label= f'{teor_label}', linewidth=0.7)
+                plt.plot(x_teor, f2(x_teor), label=teor_label, linewidth=0.7)
 
                 # сбор данных в таблицу c обеспеченностями
                 df_1[f'{teor_label}'] = df_1['Обеспеченность'].apply(lambda x: round(selected_dist.ppf(1-x/100, *params), precision))
 
                 # сбор данных в таблицу с параметрами распределения
-                def format_stat(value):
-                    """Форматирует статистику: заменяет nan/inf на 'Не существует'."""
-                    if np.isnan(value) or np.isinf(value):
-                        return "Не существует"
-                    else:
-                        return value
-
                 # Для scipy распределений
                 if isinstance(selected_dist, ScipyDistributionAdapter):
-                    dist = selected_dist._dist(*params)
+                    # Используем сохраненное распределение, если оно есть, иначе создаем новое
+                    if distribution in distribution_objects:
+                        dist = distribution_objects[distribution]
+                    else:
+                        dist = selected_dist._dist(*params)
                     mean = dist.mean()
                     std = dist.std()
                     cv = format_stat(std/mean)
@@ -459,16 +513,11 @@ if uploaded_file:
                 # Для L-moments распределений
                 elif isinstance(selected_dist, LMomentsDistributionAdapter):
                     try:
-                        # Создаем соответствующее scipy распределение с параметрами L-moments
-                        if selected_dist._lmoments_name == 'gum':
-                            # Гумбеля: loc, scale
-                            dist = stats.gumbel_r(loc=params[0], scale=params[1])
-                        elif selected_dist._lmoments_name == 'pe3':
-                            # Пирсон 3 типа: skew, loc, scale
-                            dist = stats.pearson3(skew=params[0], loc=params[1], scale=params[2])
-                        elif selected_dist._lmoments_name == 'gev':
-                            # Обобщенное экстремальное: c, loc, scale
-                            dist = stats.genextreme(c=params[0], loc=params[1], scale=params[2])
+                        # Используем уже созданное распределение из A-D теста
+                        if distribution in distribution_objects:
+                            dist = distribution_objects[distribution]
+                        else:
+                            dist = create_scipy_dist_from_lmoments(selected_dist._lmoments_name, params)
                         
                         mean = dist.mean()
                         std = dist.std()
@@ -483,9 +532,23 @@ if uploaded_file:
                 elif isinstance(selected_dist, CustomDistributionAdapter) and 'Крицкого-Менкеля' in distribution:
                     try:
                         γ, a, b = params
-                        mean = km_mean(γ, a, b) * scaler.iloc[0]  # Возвращаем в исходный масштаб
+                        mean = km_mean(γ, a, b) * scaler_value  # Возвращаем в исходный масштаб
                         cv = format_stat(km_coefficient_of_variation(γ, a, b))
                         cs = format_stat(km_coefficient_of_skewness(γ, a, b))
+                    except Exception as e:
+                        st.warning(f"Ошибка при расчете статистик для {distribution}: {str(e)}")
+                        mean = "Ошибка"
+                        cv = "Ошибка"
+                        cs = "Ошибка"
+                # Для кастомного распределения Гумбеля (Мом)
+                elif isinstance(selected_dist, CustomDistributionAdapter) and 'Гумбеля (Мом)' in distribution:
+                    try:
+                        # Используем scipy.stats.gumbel_r для расчета статистик
+                        dist = stats.gumbel_r(loc=params[0], scale=params[1])
+                        mean = dist.mean()
+                        std = dist.std()
+                        cv = format_stat(std/mean)
+                        cs = format_stat(dist.stats(moments='s'))
                     except Exception as e:
                         st.warning(f"Ошибка при расчете статистик для {distribution}: {str(e)}")
                         mean = "Ошибка"
@@ -524,7 +587,8 @@ if uploaded_file:
                 custom_dict = {}
                 for distribution in distributions_to_plot:
                     selected_dist = distributions[distribution]
-                    params = selected_dist.fit(data[values_col])
+                    # Используем сохраненные параметры вместо повторного вычисления
+                    params = distribution_params[distribution]
                     teor_label = distribution
                     custom_dict[teor_label] = selected_dist.ppf(1-p/100, *params)
                 custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
@@ -672,5 +736,3 @@ if uploaded_file:
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
-
-
