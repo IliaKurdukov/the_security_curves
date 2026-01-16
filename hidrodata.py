@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -672,3 +672,4 @@ if uploaded_file:
 
     except Exception as e:
         st.error(f"Ошибка: {str(e)}")
+
