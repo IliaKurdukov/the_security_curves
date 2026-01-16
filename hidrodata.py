@@ -398,10 +398,10 @@ if uploaded_file:
                 opacity: 1;
             }
             </style>
-            <div style="display: flex; align-items: center; margin-bottom: -10px;">
+            <div style="display: flex; align-items: center;">
                 <span>Выберите распределение для аппроксимации</span>
                 <div class="dist-tooltip">
-                    <span style="font-size: 16px; color: #666;">❓</span>
+                    <span style="font-size: 16px; color: #666;">ⓘ</span>
                     <span class="dist-tooltiptext">
                         <b>Расшифровка аббревиатур:</b><br>
                         • <b>ММП</b> - метод максимального правдоподобия<br>
