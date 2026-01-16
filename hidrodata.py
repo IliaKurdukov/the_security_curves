@@ -355,10 +355,68 @@ if uploaded_file:
                 'Обобщенное (L-мом)': DistributionFactory.lmoments('gev', 'Обобщенное (L-мом)')
             }
 
+            # Добавляем подсказку с расшифровкой аббревиатур
+            st.markdown("""
+            <style>
+            .dist-tooltip {
+                position: relative;
+                display: inline-block;
+                cursor: help;
+                margin-left: 5px;
+            }
+            .dist-tooltip .dist-tooltiptext {
+                visibility: hidden;
+                width: 220px;
+                background-color: #333;
+                color: #fff;
+                text-align: left;
+                border-radius: 6px;
+                padding: 10px;
+                position: absolute;
+                z-index: 1000;
+                bottom: 125%;
+                left: 50%;
+                margin-left: -110px;
+                opacity: 0;
+                transition: opacity 0.3s;
+                font-size: 12px;
+                line-height: 1.5;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            }
+            .dist-tooltip .dist-tooltiptext::after {
+                content: "";
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                margin-left: -5px;
+                border-width: 5px;
+                border-style: solid;
+                border-color: #333 transparent transparent transparent;
+            }
+            .dist-tooltip:hover .dist-tooltiptext {
+                visibility: visible;
+                opacity: 1;
+            }
+            </style>
+            <div style="display: flex; align-items: center; margin-bottom: -10px;">
+                <span>Выберите распределение для аппроксимации</span>
+                <div class="dist-tooltip">
+                    <span style="font-size: 16px; color: #666;">❓</span>
+                    <span class="dist-tooltiptext">
+                        <b>Расшифровка аббревиатур:</b><br>
+                        • <b>ММП</b> - метод максимального правдоподобия<br>
+                        • <b>Мом</b> - метод моментов<br>
+                        • <b>L-мом</b> - метод L-моментов
+                    </span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
             distributions_to_plot = st.multiselect(
-                'Выберите распределение для аппроксимации',
+                '',
                 distributions,
-                default = [list(distributions)[-1]]
+                default = [list(distributions)[-1]],
+                label_visibility="collapsed"
             )
 
             # инициализация функции для изменения масштаба по горизонтальной оси
