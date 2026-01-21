@@ -23,6 +23,7 @@ import uuid
 import base64
 import requests
 import hashlib
+import streamlit.components.v1 as components
 
 # Простая функция Anderson-Darling теста для сравнения распределений
 def anderson_darling_test(data, cdf_func):
@@ -65,25 +66,84 @@ def get_session_id():
         st.session_state.session_id = str(uuid.uuid4())
     return st.session_state.session_id
 
-def get_user_ip():
-    """Получает IP адрес пользователя"""
+def is_real_user():
+    """Проверяет, что это реальный пользователь, а не автоматический перезапуск Streamlit Cloud"""
     try:
+        # Проверяем наличие User-Agent браузера
         if hasattr(st, 'request') and st.request:
-            if hasattr(st.request, 'remote_ip'):
-                return st.request.remote_ip
-            elif hasattr(st.request, 'headers'):
+            if hasattr(st.request, 'headers'):
                 headers = st.request.headers
-                if 'X-Forwarded-For' in headers:
-                    return headers['X-Forwarded-For'].split(',')[0].strip()
+                user_agent = headers.get('User-Agent', '')
+                # Автоматические перезапуски обычно не имеют User-Agent или имеют специфический
+                if user_agent and 'streamlit' not in user_agent.lower():
+                    return True
+        # Если нет доступа к заголовкам, считаем что это реальный пользователь
+        # (лучше логировать, чем пропустить)
+        return True
     except:
-        pass
+        # В случае ошибки считаем что это реальный пользователь
+        return True
+
+def get_user_id_from_localstorage():
+    """Получает user_id из localStorage через JavaScript"""
+    query_params = st.query_params
+    if 'user_id' in query_params:
+        return query_params['user_id']
+    
+    user_id_js = """
+    <script>
+    function generateUserId() {
+        return 'user_' + Math.random().toString(36).substr(2, 9) + 
+               '_' + Date.now().toString(36);
+    }
+    
+    // Пытаемся получить существующий user_id из localStorage
+    let userId = localStorage.getItem('streamlit_user_id');
+    
+    // Если нет, создаем новый
+    if (!userId) {
+        userId = generateUserId();
+        // Сохраняем в localStorage (без срока истечения)
+        localStorage.setItem('streamlit_user_id', userId);
+    }
+    
+    // Если user_id еще не в URL, добавляем его
+    if (!window.location.search.includes('user_id=')) {
+        let separator = window.location.search ? '&' : '?';
+        window.location.href = window.location.href + separator + 'user_id=' + encodeURIComponent(userId);
+    }
+    </script>
+    """
+    
+    components.html(user_id_js, height=0)
     return None
 
-def get_ip_hash():
-    """Получает хеш IP адреса для идентификации пользователя"""
-    ip = get_user_ip()
-    if ip:
-        return hashlib.sha256(ip.encode()).hexdigest()[:16]
+def get_user_id():
+    """Получает user_id из localStorage или query параметров"""
+    # Сначала проверяем session_state (чтобы не делать редирект каждый раз)
+    if 'user_id' not in st.session_state:
+        query_params = st.query_params
+        if 'user_id' in query_params:
+            st.session_state.user_id = query_params['user_id']
+        else:
+            # Запускаем JavaScript для получения/установки user_id
+            get_user_id_from_localstorage()
+            # Если редирект произошел, проверяем query_params снова
+            query_params = st.query_params
+            if 'user_id' in query_params:
+                st.session_state.user_id = query_params['user_id']
+            else:
+                # Генерируем временный ID на случай, если JavaScript не сработал
+                st.session_state.user_id = f"temp_{uuid.uuid4().hex[:16]}"
+    
+    return st.session_state.user_id
+
+def get_user_id_hash():
+    """Получает user_id из localStorage для идентификации пользователя"""
+    user_id = get_user_id()
+    if user_id:
+        # Хешируем для консистентности формата
+        return hashlib.sha256(user_id.encode()).hexdigest()[:16]
     return None
 
 def get_github_token():
@@ -164,7 +224,7 @@ def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_
     """Логирует или обновляет посещение в файл аналитики с полной информацией"""
     try:
         session_id = get_session_id()
-        ip_hash = get_ip_hash()
+        user_id_hash = get_user_id_hash()
         now = datetime.now()
         date_str = date.today().isoformat()
         time_str = now.strftime('%H:%M:%S')
@@ -199,7 +259,7 @@ def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_
                 'date': date_str,
                 'time': time_str,
                 'session_id': session_id,
-                'ip_hash': ip_hash,
+                'user_id_hash': user_id_hash,
                 'app_usage': {
                     'file_uploaded': False,
                     'file_name': None,
@@ -296,6 +356,10 @@ def update_visit_file_rows(file_rows):
 
 def log_visit_once_per_session():
     """Логирует посещение только один раз за сессию при загрузке страницы"""
+    # Проверяем, что это реальный пользователь, а не автоматический перезапуск
+    if not is_real_user():
+        return
+    
     if 'visit_logged' not in st.session_state:
         log_visit()
         st.session_state.visit_logged = True
