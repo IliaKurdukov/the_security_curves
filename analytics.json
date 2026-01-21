@@ -1,0 +1,19 @@
+{
+  "visits": [
+    {
+      "date": "2026-01-21",
+      "time": "22:16:42",
+      "session_id": "e8aefe81-63df-4af6-9bd1-2742f6eb24b8",
+      "user_id_hash": "53b38567d704fe71",
+      "app_usage": {
+        "file_uploaded": false,
+        "file_name": null,
+        "file_size": null,
+        "file_rows": null,
+        "distributions_selected": [],
+        "distributions_count": 0,
+        "custom_ensurence_value": null
+      }
+    }
+  ]
+}
