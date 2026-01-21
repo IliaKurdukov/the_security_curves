@@ -2,7 +2,7 @@
   "visits": [
     {
       "date": "2026-01-21",
-      "time": "19:42:24",
+      "time": "19:42:26",
       "session_id": "fd5fb617-92fd-4afc-9087-47d991c85bd4",
       "ip_hash": null,
       "app_usage": {
@@ -15,7 +15,7 @@
           "Пирсона 3 типа (ММП)"
         ],
         "distributions_count": 2,
-        "custom_ensurence_value": 0.001
+        "custom_ensurence_value": 0.08
       }
     }
   ]
