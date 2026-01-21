@@ -2,7 +2,7 @@
   "visits": [
     {
       "date": "2026-01-21",
-      "time": "22:16:59",
+      "time": "22:17:02",
       "session_id": "e8aefe81-63df-4af6-9bd1-2742f6eb24b8",
       "user_id_hash": "53b38567d704fe71",
       "app_usage": {
@@ -11,9 +11,12 @@
         "file_size": 10848,
         "file_rows": 62,
         "distributions_selected": [
-          "Обобщенное (L-мом)"
+          "Обобщенное (L-мом)",
+          "Обобщенное (ММП)",
+          "Крицкого-Менкеля (ММП)",
+          "Гумбеля (L-мом)"
         ],
-        "distributions_count": 1,
+        "distributions_count": 4,
         "custom_ensurence_value": 0.001
       }
     }
