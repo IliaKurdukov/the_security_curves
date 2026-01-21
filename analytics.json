@@ -2,13 +2,13 @@
   "visits": [
     {
       "date": "2026-01-21",
-      "time": "19:41:36",
+      "time": "19:41:44",
       "session_id": "fd5fb617-92fd-4afc-9087-47d991c85bd4",
       "ip_hash": null,
       "app_usage": {
-        "file_uploaded": false,
-        "file_name": null,
-        "file_size": null,
+        "file_uploaded": true,
+        "file_name": "Уровни.xlsx",
+        "file_size": 10848,
         "file_rows": null,
         "distributions_selected": [],
         "distributions_count": 0,
