@@ -16,6 +16,10 @@ from scipy.integrate import quad
 import math
 from math import pi
 from sympy import EulerGamma
+import json
+import os
+from datetime import date
+import uuid
 
 # Простая функция Anderson-Darling теста для сравнения распределений
 def anderson_darling_test(data, cdf_func):
@@ -43,7 +47,54 @@ def anderson_darling_test(data, cdf_func):
 
 ru_dict = {'page_title': "Кривые обеспеченности",
            'title': "📉 Кривые обеспеченности"}
-           
+
+# ==================== СИСТЕМА АНАЛИТИКИ ====================
+ANALYTICS_FILE = "analytics.json"
+
+def get_session_id():
+    """Получает или создает уникальный ID сессии"""
+    if 'session_id' not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+    return st.session_state.session_id
+
+def log_visit():
+    """Логирует посещение в файл аналитики (только дата и уникальный ID)"""
+    try:
+        session_id = get_session_id()
+        date_str = date.today().isoformat()
+        
+        visit_data = {
+            'date': date_str,
+            'session_id': session_id
+        }
+        
+        # Читаем существующие данные
+        if os.path.exists(ANALYTICS_FILE):
+            try:
+                with open(ANALYTICS_FILE, 'r', encoding='utf-8') as f:
+                    analytics_data = json.load(f)
+            except:
+                analytics_data = {'visits': []}
+        else:
+            analytics_data = {'visits': []}
+        
+        # Добавляем новое посещение
+        analytics_data['visits'].append(visit_data)
+        
+        # Сохраняем обратно
+        with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(analytics_data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        # Тихая ошибка - не прерываем работу приложения
+        pass
+
+def log_visit_once_per_session():
+    """Логирует посещение только один раз за сессию"""
+    if 'visit_logged' not in st.session_state:
+        log_visit()
+        st.session_state.visit_logged = True
+
+# ==================== КОНЕЦ СИСТЕМЫ АНАЛИТИКИ ====================
 
 st.set_page_config(
     page_title=ru_dict['page_title'],
@@ -53,6 +104,9 @@ st.set_page_config(
         'About': "Приложение для анализа экстремальных событий"
     }
 )
+
+# Логируем посещение при загрузке страницы
+log_visit_once_per_session()
 
 st.title(ru_dict['title'])
 
