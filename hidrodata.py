@@ -20,6 +20,8 @@ import json
 import os
 from datetime import date
 import uuid
+import base64
+import requests
 
 # Простая функция Anderson-Darling теста для сравнения распределений
 def anderson_darling_test(data, cdf_func):
@@ -50,12 +52,91 @@ ru_dict = {'page_title': "Кривые обеспеченности",
 
 # ==================== СИСТЕМА АНАЛИТИКИ ====================
 ANALYTICS_FILE = "analytics.json"
+# Настройки GitHub репозитория для автоматического коммита
+GITHUB_REPO_OWNER = "IliaKurdukov"
+GITHUB_REPO_NAME = "the_security_curves"
+GITHUB_BRANCH = "main"
+GITHUB_FILE_PATH = "analytics.json"
 
 def get_session_id():
     """Получает или создает уникальный ID сессии"""
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
     return st.session_state.session_id
+
+def get_github_token():
+    """Получает GitHub токен из секретов Streamlit"""
+    try:
+        # Пытаемся получить токен из секретов Streamlit
+        # В Streamlit Cloud нужно добавить секрет через Settings -> Secrets
+        return st.secrets.get("github_token", None)
+    except:
+        return None
+
+def commit_to_github(content):
+    """Коммитит файл в GitHub репозиторий через API"""
+    token = get_github_token()
+    if not token:
+        # Если токен не настроен, просто сохраняем локально
+        return False
+    
+    try:
+        # Получаем текущий файл из GitHub (если существует)
+        url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/{GITHUB_FILE_PATH}"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        # Проверяем, существует ли файл
+        response = requests.get(url, headers=headers)
+        sha = None
+        if response.status_code == 200:
+            sha = response.json().get("sha")
+        
+        # Подготавливаем данные для коммита
+        content_encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+        
+        data = {
+            "message": f"Auto-update analytics: {date.today().isoformat()}",
+            "content": content_encoded,
+            "branch": GITHUB_BRANCH
+        }
+        
+        if sha:
+            data["sha"] = sha
+        
+        # Коммитим файл
+        response = requests.put(url, headers=headers, json=data)
+        
+        return response.status_code in [200, 201]
+    except Exception as e:
+        # Тихая ошибка - не прерываем работу приложения
+        return False
+
+def load_from_github():
+    """Загружает данные аналитики из GitHub"""
+    token = get_github_token()
+    if not token:
+        return None
+    
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/{GITHUB_FILE_PATH}"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            content = response.json().get("content", "")
+            # Декодируем base64
+            decoded_content = base64.b64decode(content).decode('utf-8')
+            return json.loads(decoded_content)
+    except:
+        pass
+    
+    return None
 
 def log_visit():
     """Логирует посещение в файл аналитики (только дата и уникальный ID)"""
@@ -68,22 +149,34 @@ def log_visit():
             'session_id': session_id
         }
         
-        # Читаем существующие данные
-        if os.path.exists(ANALYTICS_FILE):
-            try:
-                with open(ANALYTICS_FILE, 'r', encoding='utf-8') as f:
-                    analytics_data = json.load(f)
-            except:
+        # Пытаемся загрузить данные из GitHub (приоритет)
+        analytics_data = load_from_github()
+        
+        # Если не получилось из GitHub, пытаемся из локального файла
+        if analytics_data is None:
+            if os.path.exists(ANALYTICS_FILE):
+                try:
+                    with open(ANALYTICS_FILE, 'r', encoding='utf-8') as f:
+                        analytics_data = json.load(f)
+                except:
+                    analytics_data = {'visits': []}
+            else:
                 analytics_data = {'visits': []}
-        else:
-            analytics_data = {'visits': []}
         
         # Добавляем новое посещение
         analytics_data['visits'].append(visit_data)
         
-        # Сохраняем обратно
-        with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(analytics_data, f, ensure_ascii=False, indent=2)
+        # Сохраняем локально (на случай, если GitHub API недоступен)
+        try:
+            with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(analytics_data, f, ensure_ascii=False, indent=2)
+        except:
+            pass
+        
+        # Пытаемся закоммитить в GitHub
+        content = json.dumps(analytics_data, ensure_ascii=False, indent=2)
+        commit_to_github(content)
+        
     except Exception as e:
         # Тихая ошибка - не прерываем работу приложения
         pass
