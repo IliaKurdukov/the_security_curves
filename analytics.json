@@ -2,7 +2,7 @@
   "visits": [
     {
       "date": "2026-01-21",
-      "time": "19:41:44",
+      "time": "19:41:46",
       "session_id": "fd5fb617-92fd-4afc-9087-47d991c85bd4",
       "ip_hash": null,
       "app_usage": {
@@ -10,8 +10,10 @@
         "file_name": "Уровни.xlsx",
         "file_size": 10848,
         "file_rows": 62,
-        "distributions_selected": [],
-        "distributions_count": 0,
+        "distributions_selected": [
+          "Обобщенное (L-мом)"
+        ],
+        "distributions_count": 1,
         "custom_ensurence_value": null
       }
     }
