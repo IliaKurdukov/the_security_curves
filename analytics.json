@@ -2,7 +2,7 @@
   "visits": [
     {
       "date": "2026-01-21",
-      "time": "22:16:54",
+      "time": "22:16:56",
       "session_id": "e8aefe81-63df-4af6-9bd1-2742f6eb24b8",
       "user_id_hash": "53b38567d704fe71",
       "app_usage": {
@@ -14,7 +14,7 @@
           "Обобщенное (L-мом)"
         ],
         "distributions_count": 1,
-        "custom_ensurence_value": null
+        "custom_ensurence_value": 0.001
       }
     }
   ]
