@@ -18,10 +18,11 @@ from math import pi
 from sympy import EulerGamma
 import json
 import os
-from datetime import date
+from datetime import date, datetime
 import uuid
 import base64
 import requests
+import hashlib
 
 # Простая функция Anderson-Darling теста для сравнения распределений
 def anderson_darling_test(data, cdf_func):
@@ -63,6 +64,27 @@ def get_session_id():
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
     return st.session_state.session_id
+
+def get_user_ip():
+    """Получает IP адрес пользователя"""
+    try:
+        if hasattr(st, 'request') and st.request:
+            if hasattr(st.request, 'remote_ip'):
+                return st.request.remote_ip
+            elif hasattr(st.request, 'headers'):
+                headers = st.request.headers
+                if 'X-Forwarded-For' in headers:
+                    return headers['X-Forwarded-For'].split(',')[0].strip()
+    except:
+        pass
+    return None
+
+def get_ip_hash():
+    """Получает хеш IP адреса для идентификации пользователя"""
+    ip = get_user_ip()
+    if ip:
+        return hashlib.sha256(ip.encode()).hexdigest()[:16]
+    return None
 
 def get_github_token():
     """Получает GitHub токен из секретов Streamlit"""
@@ -138,21 +160,17 @@ def load_from_github():
     
     return None
 
-def log_visit():
-    """Логирует посещение в файл аналитики (только дата и уникальный ID)"""
+def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_value=None):
+    """Логирует или обновляет посещение в файл аналитики с полной информацией"""
     try:
         session_id = get_session_id()
+        ip_hash = get_ip_hash()
+        now = datetime.now()
         date_str = date.today().isoformat()
+        time_str = now.strftime('%H:%M:%S')
         
-        visit_data = {
-            'date': date_str,
-            'session_id': session_id
-        }
-        
-        # Пытаемся загрузить данные из GitHub (приоритет)
+        # Загружаем данные
         analytics_data = load_from_github()
-        
-        # Если не получилось из GitHub, пытаемся из локального файла
         if analytics_data is None:
             if os.path.exists(ANALYTICS_FILE):
                 try:
@@ -163,17 +181,75 @@ def log_visit():
             else:
                 analytics_data = {'visits': []}
         
-        # Добавляем новое посещение
-        analytics_data['visits'].append(visit_data)
+        # Ищем существующую запись для этой сессии
+        existing_visit = None
+        for visit in reversed(analytics_data.get('visits', [])):
+            if visit.get('session_id') == session_id:
+                existing_visit = visit
+                break
         
-        # Сохраняем локально (на случай, если GitHub API недоступен)
+        # Если запись существует, обновляем её, иначе создаем новую
+        if existing_visit:
+            visit_data = existing_visit
+            # Обновляем время последнего действия
+            visit_data['time'] = time_str
+        else:
+            # Создаем новую запись
+            visit_data = {
+                'date': date_str,
+                'time': time_str,
+                'session_id': session_id,
+                'ip_hash': ip_hash,
+                'app_usage': {
+                    'file_uploaded': False,
+                    'file_name': None,
+                    'file_size': None,
+                    'file_rows': None,
+                    'distributions_selected': [],
+                    'distributions_count': 0,
+                    'custom_ensurence_value': None
+                }
+            }
+            analytics_data['visits'].append(visit_data)
+        
+        # Обновляем информацию об использовании приложения
+        if 'app_usage' not in visit_data:
+            visit_data['app_usage'] = {
+                'file_uploaded': False,
+                'file_name': None,
+                'file_size': None,
+                'file_rows': None,
+                'distributions_selected': [],
+                'distributions_count': 0,
+                'custom_ensurence_value': None
+            }
+        
+        app_usage = visit_data['app_usage']
+        
+        # Если файл загружен
+        if uploaded_file:
+            app_usage['file_uploaded'] = True
+            app_usage['file_name'] = uploaded_file.name
+            app_usage['file_size'] = len(uploaded_file.getvalue())
+            # file_rows будет добавлено позже через update_visit_file_rows
+        
+        # Если распределения выбраны
+        if distributions_selected:
+            app_usage['distributions_selected'] = list(distributions_selected)
+            app_usage['distributions_count'] = len(distributions_selected)
+        
+        # Если введено значение обеспеченности
+        if custom_ensurence_value is not None:
+            app_usage['custom_ensurence_value'] = float(custom_ensurence_value)
+        
+        # Сохраняем локально
         try:
             with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(analytics_data, f, ensure_ascii=False, indent=2)
         except:
             pass
         
-        # Пытаемся закоммитить в GitHub
+        # Коммитим в GitHub
         content = json.dumps(analytics_data, ensure_ascii=False, indent=2)
         commit_to_github(content)
         
@@ -181,8 +257,45 @@ def log_visit():
         # Тихая ошибка - не прерываем работу приложения
         pass
 
+def update_visit_file_rows(file_rows):
+    """Обновляет количество строк в последнем посещении текущей сессии"""
+    try:
+        session_id = get_session_id()
+        
+        # Загружаем данные
+        analytics_data = load_from_github()
+        if analytics_data is None:
+            if os.path.exists(ANALYTICS_FILE):
+                try:
+                    with open(ANALYTICS_FILE, 'r', encoding='utf-8') as f:
+                        analytics_data = json.load(f)
+                except:
+                    return
+            else:
+                return
+        
+        # Находим последнее посещение с этим session_id
+        for visit in reversed(analytics_data.get('visits', [])):
+            if visit.get('session_id') == session_id:
+                if 'app_usage' in visit:
+                    visit['app_usage']['file_rows'] = file_rows
+                break
+        
+        # Сохраняем обновленные данные
+        try:
+            with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(analytics_data, f, ensure_ascii=False, indent=2)
+        except:
+            pass
+        
+        # Коммитим в GitHub
+        content = json.dumps(analytics_data, ensure_ascii=False, indent=2)
+        commit_to_github(content)
+    except:
+        pass
+
 def log_visit_once_per_session():
-    """Логирует посещение только один раз за сессию"""
+    """Логирует посещение только один раз за сессию при загрузке страницы"""
     if 'visit_logged' not in st.session_state:
         log_visit()
         st.session_state.visit_logged = True
@@ -334,6 +447,10 @@ if uploaded_file:
             else:
                 return "строк"  # 0, 5-20, 25-30 и т.д.
         st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}")
+        # Логируем загрузку файла
+        log_visit(uploaded_file=uploaded_file)
+        # Обновляем количество строк после обработки
+        update_visit_file_rows(len(df))
         with st.expander("# 🔢 Фрагмент загруженных данных", expanded=False):
             st.markdown(df.head().to_html(), unsafe_allow_html=True)
 
@@ -565,6 +682,10 @@ if uploaded_file:
                 default = [list(distributions)[-1]],
                 label_visibility="collapsed"
             )
+            # Логируем выбор распределений
+            if distributions_to_plot:
+                log_visit(uploaded_file=uploaded_file, 
+                         distributions_selected=distributions_to_plot)
 
             # инициализация функции для изменения масштаба по горизонтальной оси
             def scalefunc(x):
@@ -790,6 +911,13 @@ if uploaded_file:
                 max_value=99.999,
                 format="%.3f"
                 )
+                # Логируем ввод значения обеспеченности (только если значение изменилось)
+                if 'last_logged_p' not in st.session_state or st.session_state.last_logged_p != p:
+                    log_visit(uploaded_file=uploaded_file,
+                             distributions_selected=distributions_to_plot,
+                             custom_ensurence_value=p)
+                    st.session_state.last_logged_p = p
+                
                 custom_dict = {}
                 for distribution in distributions_to_plot:
                     selected_dist = distributions[distribution]
