@@ -2,7 +2,7 @@
   "visits": [
     {
       "date": "2026-01-21",
-      "time": "19:41:56",
+      "time": "19:41:58",
       "session_id": "fd5fb617-92fd-4afc-9087-47d991c85bd4",
       "ip_hash": null,
       "app_usage": {
@@ -11,9 +11,16 @@
         "file_size": 10848,
         "file_rows": 62,
         "distributions_selected": [
-          "Обобщенное (L-мом)"
+          "Обобщенное (L-мом)",
+          "Крицкого-Менкеля (ММП)",
+          "Пирсона 3 типа (L-мом)",
+          "Обобщенное (ММП)",
+          "Гумбеля (L-мом)",
+          "Гумбеля (ММП)",
+          "Гумбеля (Мом)",
+          "Пирсона 3 типа (ММП)"
         ],
-        "distributions_count": 1,
+        "distributions_count": 8,
         "custom_ensurence_value": 0.001
       }
     }
