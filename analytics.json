@@ -15398,13 +15398,13 @@
     },
     {
       "date": "2026-01-25",
-      "time": "10:35:44",
+      "time": "10:37:21",
       "session_id": "7f1d5977-fb13-4905-adac-0002e44da600",
       "user_id_hash": "ccc634e85b2404fe",
       "app_usage": {
-        "file_uploaded": false,
-        "file_name": null,
-        "file_size": null,
+        "file_uploaded": true,
+        "file_name": "mdc104_71146.xlsx",
+        "file_size": 28655,
         "file_rows": null,
         "distributions_selected": [],
         "distributions_count": 0,
