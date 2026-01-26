@@ -19990,7 +19990,7 @@
     },
     {
       "date": "2026-01-26",
-      "time": "10:59:10",
+      "time": "10:59:14",
       "session_id": "ab676b45-ccc5-4283-ab40-275817289c45",
       "user_id_hash": "8aa7e85522e1c40c",
       "app_usage": {
@@ -19998,8 +19998,10 @@
         "file_name": "малый Цивиль - Шигали.xlsx",
         "file_size": 39716,
         "file_rows": 137,
-        "distributions_selected": [],
-        "distributions_count": 0,
+        "distributions_selected": [
+          "Обобщенное (L-мом)"
+        ],
+        "distributions_count": 1,
         "custom_ensurence_value": null
       }
     }
