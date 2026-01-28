@@ -28659,6 +28659,21 @@
         "distributions_count": 0,
         "custom_ensurence_value": null
       }
+    },
+    {
+      "date": "2026-01-28",
+      "time": "10:57:05",
+      "session_id": "cbcbbac6-8410-46de-bfa3-cefb68ffd652",
+      "user_id_hash": "c4f99c684d79e260",
+      "app_usage": {
+        "file_uploaded": false,
+        "file_name": null,
+        "file_size": null,
+        "file_rows": null,
+        "distributions_selected": [],
+        "distributions_count": 0,
+        "custom_ensurence_value": null
+      }
     }
   ]
 }
