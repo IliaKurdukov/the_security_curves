@@ -69,88 +69,19 @@ def get_session_id():
 def is_real_user():
     """Проверяет, что это реальный пользователь, а не автоматический перезапуск Streamlit Cloud"""
     try:
-        # Проверяем наличие User-Agent браузера
         if hasattr(st, 'request') and st.request:
             if hasattr(st.request, 'headers'):
                 headers = st.request.headers
                 user_agent = headers.get('User-Agent', '')
-                # Автоматические перезапуски обычно не имеют User-Agent или имеют специфический
                 if user_agent and 'streamlit' not in user_agent.lower():
                     return True
-        # Если нет доступа к заголовкам, считаем что это реальный пользователь
-        # (лучше логировать, чем пропустить)
         return True
     except:
-        # В случае ошибки считаем что это реальный пользователь
         return True
-
-def get_user_id_from_localstorage():
-    """Получает user_id из localStorage через JavaScript"""
-    query_params = st.query_params
-    if 'user_id' in query_params:
-        return query_params['user_id']
-    
-    user_id_js = """
-    <script>
-    function generateUserId() {
-        return 'user_' + Math.random().toString(36).substr(2, 9) + 
-               '_' + Date.now().toString(36);
-    }
-    
-    // Пытаемся получить существующий user_id из localStorage
-    let userId = localStorage.getItem('streamlit_user_id');
-    
-    // Если нет, создаем новый
-    if (!userId) {
-        userId = generateUserId();
-        // Сохраняем в localStorage (без срока истечения)
-        localStorage.setItem('streamlit_user_id', userId);
-    }
-    
-    // Если user_id еще не в URL, добавляем его
-    if (!window.location.search.includes('user_id=')) {
-        let separator = window.location.search ? '&' : '?';
-        window.location.href = window.location.href + separator + 'user_id=' + encodeURIComponent(userId);
-    }
-    </script>
-    """
-    
-    components.html(user_id_js, height=0)
-    return None
-
-def get_user_id():
-    """Получает user_id из localStorage или query параметров"""
-    # Сначала проверяем session_state (чтобы не делать редирект каждый раз)
-    if 'user_id' not in st.session_state:
-        query_params = st.query_params
-        if 'user_id' in query_params:
-            st.session_state.user_id = query_params['user_id']
-        else:
-            # Запускаем JavaScript для получения/установки user_id
-            get_user_id_from_localstorage()
-            # Если редирект произошел, проверяем query_params снова
-            query_params = st.query_params
-            if 'user_id' in query_params:
-                st.session_state.user_id = query_params['user_id']
-            else:
-                # Генерируем временный ID на случай, если JavaScript не сработал
-                st.session_state.user_id = f"temp_{uuid.uuid4().hex[:16]}"
-    
-    return st.session_state.user_id
-
-def get_user_id_hash():
-    """Получает user_id из localStorage для идентификации пользователя"""
-    user_id = get_user_id()
-    if user_id:
-        # Хешируем для консистентности формата
-        return hashlib.sha256(user_id.encode()).hexdigest()[:16]
-    return None
 
 def get_github_token():
     """Получает GitHub токен из секретов Streamlit"""
     try:
-        # Пытаемся получить токен из секретов Streamlit
-        # В Streamlit Cloud нужно добавить секрет через Settings -> Secrets
         return st.secrets.get("github_token", None)
     except:
         return None
@@ -159,24 +90,20 @@ def commit_to_github(content):
     """Коммитит файл в GitHub репозиторий через API"""
     token = get_github_token()
     if not token:
-        # Если токен не настроен, просто сохраняем локально
         return False
     
     try:
-        # Получаем текущий файл из GitHub (если существует)
         url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/{GITHUB_FILE_PATH}"
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github.v3+json"
         }
         
-        # Проверяем, существует ли файл
         response = requests.get(url, headers=headers)
         sha = None
         if response.status_code == 200:
             sha = response.json().get("sha")
         
-        # Подготавливаем данные для коммита
         content_encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
         
         data = {
@@ -188,12 +115,10 @@ def commit_to_github(content):
         if sha:
             data["sha"] = sha
         
-        # Коммитим файл
         response = requests.put(url, headers=headers, json=data)
         
         return response.status_code in [200, 201]
     except Exception as e:
-        # Тихая ошибка - не прерываем работу приложения
         return False
 
 def load_from_github():
@@ -212,7 +137,6 @@ def load_from_github():
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             content = response.json().get("content", "")
-            # Декодируем base64
             decoded_content = base64.b64decode(content).decode('utf-8')
             return json.loads(decoded_content)
     except:
@@ -223,13 +147,17 @@ def load_from_github():
 def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_value=None):
     """Логирует или обновляет посещение в файл аналитики с полной информацией"""
     try:
+        # Проверяем, нужно ли логировать
+        should_log = uploaded_file is not None
+        
+        if not should_log:
+            return
+            
         session_id = get_session_id()
-        user_id_hash = get_user_id_hash()
         now = datetime.now()
         date_str = date.today().isoformat()
         time_str = now.strftime('%H:%M:%S')
         
-        # Загружаем данные
         analytics_data = load_from_github()
         if analytics_data is None:
             if os.path.exists(ANALYTICS_FILE):
@@ -241,27 +169,21 @@ def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_
             else:
                 analytics_data = {'visits': []}
         
-        # Ищем существующую запись для этой сессии
         existing_visit = None
         for visit in reversed(analytics_data.get('visits', [])):
             if visit.get('session_id') == session_id:
                 existing_visit = visit
                 break
         
-        # Если запись существует, обновляем её, иначе создаем новую
         if existing_visit:
             visit_data = existing_visit
-            # Обновляем время последнего действия
             visit_data['time'] = time_str
         else:
-            # Создаем новую запись
             visit_data = {
                 'date': date_str,
                 'time': time_str,
                 'session_id': session_id,
-                'user_id_hash': user_id_hash,
                 'app_usage': {
-                    'file_uploaded': False,
                     'file_name': None,
                     'file_size': None,
                     'file_rows': None,
@@ -272,10 +194,8 @@ def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_
             }
             analytics_data['visits'].append(visit_data)
         
-        # Обновляем информацию об использовании приложения
         if 'app_usage' not in visit_data:
             visit_data['app_usage'] = {
-                'file_uploaded': False,
                 'file_name': None,
                 'file_size': None,
                 'file_rows': None,
@@ -286,35 +206,27 @@ def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_
         
         app_usage = visit_data['app_usage']
         
-        # Если файл загружен
         if uploaded_file:
-            app_usage['file_uploaded'] = True
             app_usage['file_name'] = uploaded_file.name
             app_usage['file_size'] = len(uploaded_file.getvalue())
-            # file_rows будет добавлено позже через update_visit_file_rows
         
-        # Если распределения выбраны
         if distributions_selected:
             app_usage['distributions_selected'] = list(distributions_selected)
             app_usage['distributions_count'] = len(distributions_selected)
         
-        # Если введено значение обеспеченности
         if custom_ensurence_value is not None:
             app_usage['custom_ensurence_value'] = float(custom_ensurence_value)
         
-        # Сохраняем локально
         try:
             with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(analytics_data, f, ensure_ascii=False, indent=2)
         except:
             pass
         
-        # Коммитим в GitHub
         content = json.dumps(analytics_data, ensure_ascii=False, indent=2)
         commit_to_github(content)
         
     except Exception as e:
-        # Тихая ошибка - не прерываем работу приложения
         pass
 
 def update_visit_file_rows(file_rows):
@@ -322,7 +234,6 @@ def update_visit_file_rows(file_rows):
     try:
         session_id = get_session_id()
         
-        # Загружаем данные
         analytics_data = load_from_github()
         if analytics_data is None:
             if os.path.exists(ANALYTICS_FILE):
@@ -334,21 +245,18 @@ def update_visit_file_rows(file_rows):
             else:
                 return
         
-        # Находим последнее посещение с этим session_id
         for visit in reversed(analytics_data.get('visits', [])):
             if visit.get('session_id') == session_id:
                 if 'app_usage' in visit:
                     visit['app_usage']['file_rows'] = file_rows
                 break
         
-        # Сохраняем обновленные данные
         try:
             with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(analytics_data, f, ensure_ascii=False, indent=2)
         except:
             pass
         
-        # Коммитим в GitHub
         content = json.dumps(analytics_data, ensure_ascii=False, indent=2)
         commit_to_github(content)
     except:
@@ -356,14 +264,11 @@ def update_visit_file_rows(file_rows):
 
 def log_visit_once_per_session():
     """Логирует посещение только один раз за сессию при загрузке страницы"""
-    # Проверяем, что это реальный пользователь, а не автоматический перезапуск
     if not is_real_user():
         return
     
     if 'visit_logged' not in st.session_state:
-        log_visit()
         st.session_state.visit_logged = True
-
 # ==================== КОНЕЦ СИСТЕМЫ АНАЛИТИКИ ====================
 
 st.set_page_config(
@@ -374,9 +279,6 @@ st.set_page_config(
         'About': "Приложение для анализа экстремальных событий"
     }
 )
-
-# Логируем посещение при загрузке страницы
-log_visit_once_per_session()
 
 st.title(ru_dict['title'])
 
