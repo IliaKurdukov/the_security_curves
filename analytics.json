@@ -29646,7 +29646,7 @@
         "file_uploaded": true,
         "file_name": "тувси.xlsx",
         "file_size": 9060,
-        "file_rows": null,
+        "file_rows": 70,
         "distributions_selected": [],
         "distributions_count": 0,
         "custom_ensurence_value": null
