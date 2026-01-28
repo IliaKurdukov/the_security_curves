@@ -29607,7 +29607,7 @@
     },
     {
       "date": "2026-01-28",
-      "time": "19:45:48",
+      "time": "19:45:53",
       "session_id": "5afacfc8-1c3b-48fc-9de0-ba3de62828bb",
       "user_id_hash": "787497b63b6747f3",
       "app_usage": {
@@ -29617,9 +29617,10 @@
         "file_rows": 34,
         "distributions_selected": [
           "Пирсона 3 типа (ММП)",
-          "Крицкого-Менкеля (ММП)"
+          "Крицкого-Менкеля (ММП)",
+          "Гумбеля (Мом)"
         ],
-        "distributions_count": 2,
+        "distributions_count": 3,
         "custom_ensurence_value": 0.001
       }
     },
