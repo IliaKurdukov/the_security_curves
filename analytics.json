@@ -29639,13 +29639,13 @@
     },
     {
       "date": "2026-01-28",
-      "time": "16:15:23",
+      "time": "16:16:43",
       "session_id": "bfe43007-06b5-4c04-a6d1-d4fc7c51c3c0",
       "user_id_hash": "d2adfd88980426c1",
       "app_usage": {
-        "file_uploaded": false,
-        "file_name": null,
-        "file_size": null,
+        "file_uploaded": true,
+        "file_name": "тувси.xlsx",
+        "file_size": 9060,
         "file_rows": null,
         "distributions_selected": [],
         "distributions_count": 0,
