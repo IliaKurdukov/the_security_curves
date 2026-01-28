@@ -29639,7 +29639,7 @@
     },
     {
       "date": "2026-01-28",
-      "time": "16:16:43",
+      "time": "16:16:49",
       "session_id": "bfe43007-06b5-4c04-a6d1-d4fc7c51c3c0",
       "user_id_hash": "d2adfd88980426c1",
       "app_usage": {
@@ -29647,8 +29647,10 @@
         "file_name": "тувси.xlsx",
         "file_size": 9060,
         "file_rows": 70,
-        "distributions_selected": [],
-        "distributions_count": 0,
+        "distributions_selected": [
+          "Обобщенное (L-мом)"
+        ],
+        "distributions_count": 1,
         "custom_ensurence_value": null
       }
     },
