@@ -29614,7 +29614,7 @@
         "file_uploaded": true,
         "file_name": "шигали.XLSX",
         "file_size": 8706,
-        "file_rows": null,
+        "file_rows": 57,
         "distributions_selected": [],
         "distributions_count": 0,
         "custom_ensurence_value": null
