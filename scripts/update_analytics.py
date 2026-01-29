@@ -177,7 +177,6 @@ def update_readme_with_analytics():
     commit_changes()
 
 def commit_changes():
-    """Коммитит изменения в репозиторий"""
     try:
         import subprocess
         subprocess.run(['git', 'config', '--global', 'user.email', 'actions@github.com'], check=True)
