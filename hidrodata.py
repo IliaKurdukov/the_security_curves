@@ -56,6 +56,7 @@ ru_dict = {'page_title': "Кривые обеспеченности",
 GITHUB_REPO_OWNER = "IliaKurdukov"
 GITHUB_REPO_NAME = "the_security_curves"
 GITHUB_BRANCH = "main"
+CSV_SEPARATOR = ";"  # Новый разделитель вместо запятой
 
 def get_session_id():
     if 'session_id' not in st.session_state:
@@ -83,12 +84,10 @@ def get_csv_from_github(token):
         
         file_data = response.json()
         content = base64.b64decode(file_data['content']).decode('utf-8')
-        lines = content.split('\n')
         sha = file_data['sha']
-        
-        return sha, content, lines
+        return sha, content
     except:
-        return None, None, []
+        return None, None
 
 def save_to_github(token, sha, content):
     """Сохраняет CSV файл на GitHub"""
@@ -111,33 +110,26 @@ def save_to_github(token, sha, content):
     except:
         return False
 
-def parse_custom_values(value_str):
-    """Парсит строку с custom_ensurence_value"""
-    if not value_str or value_str == "None" or value_str == "[]":
+def format_list_for_csv(items):
+    """Форматирует список в строку для CSV"""
+    if not items:
+        return "[]"
+    # Экранируем кавычки и разделители
+    return "[" + ", ".join(str(item).replace('"', '""') for item in items) + "]"
+
+def parse_list_from_csv(csv_string):
+    """Парсит список из CSV строки"""
+    if not csv_string or csv_string == "[]":
         return []
-    
     try:
-        # Удаляем скобки и разбиваем
-        values = value_str.strip('[]').split(',')
-        result = []
-        for v in values:
-            v = v.strip()
-            if v:
-                num = float(v)
-                if abs(num - 0.001) > 0.0001:  # Исключаем значение по умолчанию
-                    result.append(num)
-        return result
+        # Убираем квадратные скобки
+        items = csv_string[1:-1].split(", ")
+        return [item.strip().replace('""', '"') for item in items if item.strip()]
     except:
         return []
 
-def format_custom_values(values):
-    """Форматирует список в строку"""
-    if not values:
-        return "[]"
-    return "[" + ", ".join(str(v) for v in values) + "]"
-
 def log_analytics(uploaded_file=None, distributions_selected=None, custom_ensurence_value=None):
-    """Создает/обновляет запись в аналитике"""
+    """Создает/обновляет запись в аналитике - только последний выбор"""
     try:
         token = get_github_token()
         if not token or not uploaded_file:
@@ -146,62 +138,98 @@ def log_analytics(uploaded_file=None, distributions_selected=None, custom_ensure
         session_id = get_session_id()
         
         # Получаем текущий CSV
-        sha, content, lines = get_csv_from_github(token)
+        sha, content = get_csv_from_github(token)
         if sha is None:
             return False
         
+        # Разбираем CSV
+        lines = content.split('\n')
+        if not lines or len(lines) < 2:
+            # Создаем новый файл с заголовком
+            headers = f"date{CSV_SEPARATOR}time{CSV_SEPARATOR}session_id{CSV_SEPARATOR}file_name{CSV_SEPARATOR}file_size{CSV_SEPARATOR}file_rows{CSV_SEPARATOR}distributions_selected{CSV_SEPARATOR}distributions_count{CSV_SEPARATOR}custom_ensurence_value"
+            lines = [headers, ""]
+        
         # Ищем запись этой сессии
         session_found = False
-        session_index = -1
-        
-        for i, line in enumerate(lines):
-            if i > 0 and line.strip() and session_id in line:
+        for i in range(1, len(lines)):
+            if lines[i].strip() and session_id in lines[i]:
                 session_found = True
-                session_index = i
+                session_line_index = i
                 break
         
+        now = datetime.now()
+        date_str = date.today().isoformat()
+        time_str = now.strftime('%H:%M:%S')
+        
         if session_found:
-            # Обновляем существующую запись
-            parts = lines[session_index].split(',')
+            # ОБНОВЛЯЕМ существующую запись - берем только последние значения!
+            parts = lines[session_line_index].split(CSV_SEPARATOR)
             
-            # Обновляем распределения (только если переданы)
+            # Обновляем ВСЕ поля на текущие значения (перезаписываем полностью)
+            parts[0] = date_str  # date
+            parts[1] = time_str  # time
+            
+            # distributions_selected - берем только текущий выбор
             if distributions_selected is not None:
-                parts[6] = str(list(distributions_selected))
+                parts[6] = format_list_for_csv(list(distributions_selected))
                 parts[7] = str(len(distributions_selected))
             
-            # Обновляем custom_ensurence_value (добавляем к существующим)
+            # custom_ensurence_value - добавляем только если не 0.001
             if custom_ensurence_value is not None:
-                existing_values = parse_custom_values(parts[8])
+                # Получаем текущий список значений
+                current_values = parse_list_from_csv(parts[8]) if len(parts) > 8 else []
                 custom_float = float(custom_ensurence_value)
                 
-                # Добавляем, если не 0.001 и еще нет в списке
-                if abs(custom_float - 0.001) > 0.0001 and custom_float not in existing_values:
-                    existing_values.append(custom_float)
-                    parts[8] = format_custom_values(existing_values)
+                # Добавляем только если не значение по умолчанию
+                if abs(custom_float - 0.001) > 0.0001:
+                    # Конвертируем все в float для сравнения
+                    current_floats = []
+                    for v in current_values:
+                        try:
+                            current_floats.append(float(v))
+                        except:
+                            pass
+                    
+                    # Добавляем если еще нет
+                    if custom_float not in current_floats:
+                        current_values.append(str(custom_float))
+                
+                parts[8] = format_list_for_csv(current_values)
             
-            lines[session_index] = ','.join(parts)
+            lines[session_line_index] = CSV_SEPARATOR.join(parts)
             
         else:
-            # Создаем новую запись
-            now = datetime.now()
-            date_str = date.today().isoformat()
-            time_str = now.strftime('%H:%M:%S')
+            # СОЗДАЕМ новую запись
+            # distributions_selected - текущий выбор
+            dist_list = list(distributions_selected) if distributions_selected else []
             
-            # Формируем список custom_ensurence_value
+            # custom_ensurence_value - только если не 0.001
             custom_values = []
             if custom_ensurence_value is not None:
                 custom_float = float(custom_ensurence_value)
                 if abs(custom_float - 0.001) > 0.0001:
-                    custom_values.append(custom_float)
+                    custom_values = [str(custom_float)]
             
-            new_line = f"{date_str},{time_str},{session_id},{uploaded_file.name},{len(uploaded_file.getvalue())},None,{str(list(distributions_selected)) if distributions_selected else '[]'},{len(distributions_selected) if distributions_selected else 0},{format_custom_values(custom_values)}"
+            new_line_parts = [
+                date_str,
+                time_str,
+                session_id,
+                uploaded_file.name,
+                str(len(uploaded_file.getvalue())),
+                "None",  # file_rows будет обновлено позже
+                format_list_for_csv(dist_list),
+                str(len(dist_list)),
+                format_list_for_csv(custom_values)
+            ]
             
-            # Добавляем новую строку
-            if lines and lines[-1] == '':
+            new_line = CSV_SEPARATOR.join(new_line_parts)
+            
+            # Добавляем в конец
+            if lines[-1] == "":
                 lines[-1] = new_line
             else:
                 lines.append(new_line)
-            lines.append('')  # Пустая строка в конце файла
+            lines.append("")  # Пустая строка в конце
         
         # Сохраняем обратно
         new_content = '\n'.join(lines)
@@ -220,17 +248,18 @@ def update_analytics_file_rows(file_rows):
         session_id = get_session_id()
         
         # Получаем текущий CSV
-        sha, content, lines = get_csv_from_github(token)
+        sha, content = get_csv_from_github(token)
         if sha is None:
             return False
         
-        # Ищем запись этой сессии
-        for i, line in enumerate(lines):
-            if i > 0 and line.strip() and session_id in line:
-                parts = line.split(',')
-                if len(parts) >= 6:
+        # Разбираем и обновляем
+        lines = content.split('\n')
+        for i in range(1, len(lines)):
+            if lines[i].strip() and session_id in lines[i]:
+                parts = lines[i].split(CSV_SEPARATOR)
+                if len(parts) > 5:
                     parts[5] = str(file_rows)
-                    lines[i] = ','.join(parts)
+                    lines[i] = CSV_SEPARATOR.join(parts)
                     break
         
         # Сохраняем обратно
