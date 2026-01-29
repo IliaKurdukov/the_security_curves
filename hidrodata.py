@@ -10,7 +10,7 @@ import pandas as pd
 import re
 import requests
 import scipy.stats as stats
-﻿import streamlit as st
+import streamlit as st
 import streamlit.components.v1 as components
 import subprocess
 import sys
