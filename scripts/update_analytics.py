@@ -69,14 +69,13 @@ def generate_daily_activity_mermaid(df):
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
         dates_formatted.append(f'"{date_obj.strftime("%d.%m")}"')
 
-    # ВАЖНО: Вся диаграмма — одна строка без лишних отступов
-    mermaid_code = f"""```mermaid
-xychart-beta
+    # ВАЖНО: Возвращаем ЧИСТЫЙ код диаграммы, без обратных кавычек.
+    mermaid_code = f"""xychart-beta
     title "📈 Активность за последние 15 дней"
     x-axis [{", ".join(dates_formatted)}]
     y-axis "Использований" 0 {max(daily_counts['count'].max(), 5)}
     line [{", ".join(map(str, daily_counts['count']))}]
-```"""
+"""
     return mermaid_code
 
 def generate_distributions_mermaid(df):
@@ -87,7 +86,7 @@ def generate_distributions_mermaid(df):
         all_distributions.extend(distributions)
 
     if not all_distributions:
-        return "```mermaid\ngraph TD\n    A[\"📊 Распределения не выбраны\"]\n```"
+        return "graph TD\n    A[\"📊 Распределения не выбраны\"]"
 
     from collections import Counter
     dist_counts = Counter(all_distributions)
@@ -95,16 +94,15 @@ def generate_distributions_mermaid(df):
 
     categories = []
     values = []
-    for dist, count in top_dist.head(8).items():  # Ограничим топ-8 для читаемости
+    for dist, count in top_dist.head(8).items():
         categories.append(f'"{dist}"')
         values.append(str(count))
 
-    # ВАЖНО: Данные для bar идут в ДВУХ массивах в одной строке
-    mermaid_code = f"""```mermaid
-bar
+    # ВАЖНО: Возвращаем ЧИСТЫЙ код диаграммы, без обратных кавычек.
+    mermaid_code = f"""bar
     title "📊 Топ распределений"
-    x-axis "{", ".join(categories)}" [{", ".join(values)}]```"""
-
+    x-axis "{", ".join(categories)}" [{", ".join(values)}]
+"""
     return mermaid_code
 
 def update_readme_with_analytics():
