@@ -103,8 +103,8 @@ def generate_distributions_mermaid(df):
     mermaid_code = f"""```mermaid
 bar
     title "📊 Топ распределений"
-    x-axis "{", ".join(categories)}" [{", ".join(values)}]
-```""
+    x-axis "{", ".join(categories)}" [{", ".join(values)}]```"""
+
     return mermaid_code
 
 def update_readme_with_analytics():
