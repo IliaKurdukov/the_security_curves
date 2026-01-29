@@ -57,74 +57,55 @@ def parse_distributions_list(dist_str):
 
 def generate_daily_activity_mermaid(df):
     """Генерирует mermaid график активности по дням"""
-    # Фильтруем последние 15 дней
     df['datetime'] = pd.to_datetime(df['date'])
     cutoff_date = datetime.now() - timedelta(days=15)
     df_recent = df[df['datetime'] >= cutoff_date]
-    
-    # Группируем по дням
+
     daily_counts = df_recent.groupby('date').size().reset_index(name='count')
-    
-    # Сортируем по дате
     daily_counts = daily_counts.sort_values('date')
-    
-    # Форматируем для mermaid
-    mermaid_lines = ["    xychart-beta"]
-    mermaid_lines.append('    title "📈 Активность за последние 15 дней"')
-    mermaid_lines.append('    x-axis [')
-    
-    # Даты (без года, чтобы короче)
+
     dates_formatted = []
     for date_str in daily_counts['date']:
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
         dates_formatted.append(f'"{date_obj.strftime("%d.%m")}"')
-    
-    mermaid_lines.append('      ' + ', '.join(dates_formatted))
-    mermaid_lines.append('    ]')
-    mermaid_lines.append('    y-axis "Использований" 0 ' + str(max(daily_counts['count'].max(), 5)))
-    mermaid_lines.append('    line [' + ', '.join(map(str, daily_counts['count'])) + ']')
-    
-    return "\n".join(mermaid_lines)
+
+    # ВАЖНО: Вся диаграмма — одна строка без лишних отступов
+    mermaid_code = f"""```mermaid
+xychart-beta
+    title "📈 Активность за последние 15 дней"
+    x-axis [{", ".join(dates_formatted)}]
+    y-axis "Использований" 0 {max(daily_counts['count'].max(), 5)}
+    line [{", ".join(map(str, daily_counts['count']))}]
+```"""
+    return mermaid_code
 
 def generate_distributions_mermaid(df):
     """Генерирует mermaid график популярности распределений"""
-    # Собираем все распределения
     all_distributions = []
     for dist_str in df['distributions_selected'].dropna():
         distributions = parse_distributions_list(dist_str)
         all_distributions.extend(distributions)
-    
-    # Считаем частоту
+
+    if not all_distributions:
+        return "```mermaid\ngraph TD\n    A[\"📊 Распределения не выбраны\"]\n```"
+
+    from collections import Counter
     dist_counts = Counter(all_distributions)
-    
-    if not dist_counts:
-        return "    bar\n    title \"📊 Распределения не выбраны\"\n    x-scale 0 1"
-    
-    # Берем топ-10
-    top_dist = pd.Series(dist_counts).sort_values(ascending=True).tail(10)
-    
-    # Форматируем для mermaid
-    mermaid_lines = ["    bar"]
-    mermaid_lines.append('    title "📊 Топ распределений"')
-    
-    # Данные
+    top_dist = pd.Series(dist_counts).sort_values(ascending=False)
+
     categories = []
     values = []
-    
-    for dist, count in top_dist.items():
-        # Обрезаем длинные названия
-        if len(dist) > 25:
-            dist_display = dist[:22] + "..."
-        else:
-            dist_display = dist
-        
-        categories.append(f'"{dist_display}"')
+    for dist, count in top_dist.head(8).items():  # Ограничим топ-8 для читаемости
+        categories.append(f'"{dist}"')
         values.append(str(count))
-    
-    mermaid_lines.append('    "' + '", "'.join(categories) + '"')
-    mermaid_lines.append('    ' + ', '.join(values))
-    
-    return "\n".join(mermaid_lines)
+
+    # ВАЖНО: Данные для bar идут в ДВУХ массивах в одной строке
+    mermaid_code = f"""```mermaid
+bar
+    title "📊 Топ распределений"
+    x-axis "{", ".join(categories)}" [{", ".join(values)}]
+```""
+    return mermaid_code
 
 def update_readme_with_analytics():
     """Обновляет README.md с новой аналитикой"""
