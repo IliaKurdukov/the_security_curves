@@ -128,7 +128,7 @@
     },
     {
       "date": "2026-01-29",
-      "time": "15:09:12",
+      "time": "15:09:13",
       "session_id": "7eb3dce0-6219-4508-8a8f-8dcbedd8b265",
       "user_id_hash": "2c1c608b9a62af69",
       "app_usage": {
@@ -140,7 +140,7 @@
           "Обобщенное (L-мом)"
         ],
         "distributions_count": 1,
-        "custom_ensurence_value": null
+        "custom_ensurence_value": 0.001
       }
     }
   ]
