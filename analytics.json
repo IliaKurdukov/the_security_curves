@@ -128,7 +128,7 @@
     },
     {
       "date": "2026-01-29",
-      "time": "15:09:09",
+      "time": "15:09:12",
       "session_id": "7eb3dce0-6219-4508-8a8f-8dcbedd8b265",
       "user_id_hash": "2c1c608b9a62af69",
       "app_usage": {
@@ -136,8 +136,10 @@
         "file_name": "Расчет Q и H — копия.xlsx",
         "file_size": 10860,
         "file_rows": 83,
-        "distributions_selected": [],
-        "distributions_count": 0,
+        "distributions_selected": [
+          "Обобщенное (L-мом)"
+        ],
+        "distributions_count": 1,
         "custom_ensurence_value": null
       }
     }
