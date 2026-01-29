@@ -13,13 +13,15 @@
 - Вывод таблицы с параметрами подобранного распределения (Среднее, коэффициенты вариации и асимметрии) и метриками качества (R2, средняя и максимальная ошибки,  Критерий согласия Андерсона-Дарлинга)
 
 🌐 **Онлайн-доступ**
+
 Приложение развернуто в Streamlit Cloud:
 🔗 [https://thesecuritycurves.streamlit.app/](https://thesecuritycurves-mk8pbyd72a3xukqdmtw4vb.streamlit.app/)
 
 📂 **Структура проекта**
+
 the_security_curves/  
 ├── hidrodata.py                             # Основной скрипт Streamlit  
-├── LICENSE                                  # Лицензия
+├── LICENSE                                  # Лицензия  
 ├── requirements.txt                         # Зависимости  
 ├── README.md                                # Этот файл  
 ├── analytics.csv                            # Логи использования приложения 
