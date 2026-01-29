@@ -128,13 +128,13 @@
     },
     {
       "date": "2026-01-29",
-      "time": "15:09:01",
+      "time": "15:09:09",
       "session_id": "7eb3dce0-6219-4508-8a8f-8dcbedd8b265",
       "user_id_hash": "2c1c608b9a62af69",
       "app_usage": {
-        "file_uploaded": false,
-        "file_name": null,
-        "file_size": null,
+        "file_uploaded": true,
+        "file_name": "Расчет Q и H — копия.xlsx",
+        "file_size": 10860,
         "file_rows": null,
         "distributions_selected": [],
         "distributions_count": 0,
