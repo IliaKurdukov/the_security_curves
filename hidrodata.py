@@ -1,29 +1,29 @@
-﻿import streamlit as st
-import pandas as pd
+import base64
+import hashlib
+import json
+import lmoments3 as lm
+import math
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+import pandas as pd
 import re
+import requests
 import scipy.stats as stats
+﻿import streamlit as st
+import streamlit.components.v1 as components
 import subprocess
 import sys
+import uuid
 import xlrd
 from abc import ABC, abstractmethod
-from sklearn.metrics import mean_absolute_error, r2_score, max_error
-import lmoments3 as lm
-from lmoments3 import distr
-from scipy.optimize import minimize, brentq
-from scipy.integrate import quad
-import math
-from math import pi
-from sympy import EulerGamma
-import json
-import os
 from datetime import date, datetime
-import uuid
-import base64
-import requests
-import hashlib
-import streamlit.components.v1 as components
+from lmoments3 import distr
+from math import pi
+from scipy.integrate import quad
+from scipy.optimize import minimize, brentq
+from sklearn.metrics import mean_absolute_error, r2_score, max_error
+from sympy import EulerGamma
 
 # Простая функция Anderson-Darling теста для сравнения распределений
 def anderson_darling_test(data, cdf_func):
@@ -53,222 +53,161 @@ ru_dict = {'page_title': "Кривые обеспеченности",
            'title': "📉 Кривые обеспеченности"}
 
 # ==================== СИСТЕМА АНАЛИТИКИ ====================
-ANALYTICS_FILE = "analytics.json"
-# Настройки GitHub репозитория для автоматического коммита
 GITHUB_REPO_OWNER = "IliaKurdukov"
 GITHUB_REPO_NAME = "the_security_curves"
 GITHUB_BRANCH = "main"
-GITHUB_FILE_PATH = "analytics.json"
 
 def get_session_id():
-    """Получает или создает уникальный ID сессии"""
+    """Создает уникальный ID сессии"""
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
     return st.session_state.session_id
 
-def is_real_user():
-    """Проверяет, что это реальный пользователь, а не автоматический перезапуск Streamlit Cloud"""
-    try:
-        if hasattr(st, 'request') and st.request:
-            if hasattr(st.request, 'headers'):
-                headers = st.request.headers
-                user_agent = headers.get('User-Agent', '')
-                if user_agent and 'streamlit' not in user_agent.lower():
-                    return True
-        return True
-    except:
-        return True
-
 def get_github_token():
-    """Получает GitHub токен из секретов Streamlit"""
+    """Получает GitHub токен из секретов"""
     try:
         return st.secrets.get("github_token", None)
     except:
         return None
 
-def commit_to_github(content):
-    """Коммитит файл в GitHub репозиторий через API"""
-    token = get_github_token()
-    if not token:
-        return False
-    
+def append_to_github_csv(uploaded_file, distributions_selected=None, custom_ensurence_value=None):
+    """Добавляет строку в CSV на GitHub"""
     try:
-        url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/{GITHUB_FILE_PATH}"
-        headers = {
-            "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3+json"
-        }
+        token = get_github_token()
+        if not token or not uploaded_file:
+            return False
         
-        response = requests.get(url, headers=headers)
-        sha = None
-        if response.status_code == 200:
-            sha = response.json().get("sha")
-        
-        content_encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-        
-        data = {
-            "message": f"Auto-update analytics: {date.today().isoformat()}",
-            "content": content_encoded,
-            "branch": GITHUB_BRANCH
-        }
-        
-        if sha:
-            data["sha"] = sha
-        
-        response = requests.put(url, headers=headers, json=data)
-        
-        return response.status_code in [200, 201]
-    except Exception as e:
-        return False
-
-def load_from_github():
-    """Загружает данные аналитики из GitHub"""
-    token = get_github_token()
-    if not token:
-        return None
-    
-    try:
-        url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/{GITHUB_FILE_PATH}"
-        headers = {
-            "Authorization": f"token {token}",
-            "Accept": "application/vnd.github.v3+json"
-        }
-        
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            content = response.json().get("content", "")
-            decoded_content = base64.b64decode(content).decode('utf-8')
-            return json.loads(decoded_content)
-    except:
-        pass
-    
-    return None
-
-def log_visit(uploaded_file=None, distributions_selected=None, custom_ensurence_value=None):
-    """Логирует или обновляет посещение в файл аналитики с полной информацией"""
-    try:
-        # Проверяем, нужно ли логировать
-        should_log = uploaded_file is not None
-        
-        if not should_log:
-            return
-            
         session_id = get_session_id()
         now = datetime.now()
         date_str = date.today().isoformat()
         time_str = now.strftime('%H:%M:%S')
         
-        analytics_data = load_from_github()
-        if analytics_data is None:
-            if os.path.exists(ANALYTICS_FILE):
-                try:
-                    with open(ANALYTICS_FILE, 'r', encoding='utf-8') as f:
-                        analytics_data = json.load(f)
-                except:
-                    analytics_data = {'visits': []}
+        # Формируем строку для CSV
+        new_row = {
+            'date': date_str,
+            'time': time_str,
+            'session_id': session_id,
+            'file_name': uploaded_file.name,
+            'file_size': len(uploaded_file.getvalue()),
+            'file_rows': None,  # Будет обновлено позже
+            'distributions_selected': str(list(distributions_selected)) if distributions_selected else "[]",
+            'distributions_count': len(distributions_selected) if distributions_selected else 0,
+            'custom_ensurence_value': float(custom_ensurence_value) if custom_ensurence_value else None
+        }
+        
+        # CSV строка
+        csv_line = f"{new_row['date']},{new_row['time']},{new_row['session_id']},{new_row['file_name']},{new_row['file_size']},{new_row['file_rows']},{new_row['distributions_selected']},{new_row['distributions_count']},{new_row['custom_ensurence_value']}\n"
+        
+        # GitHub API запрос
+        url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/analytics.csv"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            # Файл существует
+            file_data = response.json()
+            current_content = base64.b64decode(file_data['content']).decode('utf-8')
+            
+            if not current_content.strip():
+                # Файл пустой - добавляем заголовки
+                headers_line = "date,time,session_id,file_name,file_size,file_rows,distributions_selected,distributions_count,custom_ensurence_value\n"
+                new_content = headers_line + csv_line
             else:
-                analytics_data = {'visits': []}
-        
-        existing_visit = None
-        for visit in reversed(analytics_data.get('visits', [])):
-            if visit.get('session_id') == session_id:
-                existing_visit = visit
-                break
-        
-        if existing_visit:
-            visit_data = existing_visit
-            visit_data['time'] = time_str
+                # Добавляем строку
+                new_content = current_content.rstrip('\n') + '\n' + csv_line
+            
+            data = {
+                "message": f"Add analytics: {date_str} {time_str}",
+                "content": base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
+                "sha": file_data['sha'],
+                "branch": GITHUB_BRANCH
+            }
+            
+        elif response.status_code == 404:
+            # Создаем новый файл
+            headers_line = "date,time,session_id,file_name,file_size,file_rows,distributions_selected,distributions_count,custom_ensurence_value\n"
+            new_content = headers_line + csv_line
+            
+            data = {
+                "message": f"Create analytics file: {date_str} {time_str}",
+                "content": base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
+                "branch": GITHUB_BRANCH
+            }
         else:
-            visit_data = {
-                'date': date_str,
-                'time': time_str,
-                'session_id': session_id,
-                'app_usage': {
-                    'file_name': None,
-                    'file_size': None,
-                    'file_rows': None,
-                    'distributions_selected': [],
-                    'distributions_count': 0,
-                    'custom_ensurence_value': None
-                }
-            }
-            analytics_data['visits'].append(visit_data)
+            return False
         
-        if 'app_usage' not in visit_data:
-            visit_data['app_usage'] = {
-                'file_name': None,
-                'file_size': None,
-                'file_rows': None,
-                'distributions_selected': [],
-                'distributions_count': 0,
-                'custom_ensurence_value': None
-            }
-        
-        app_usage = visit_data['app_usage']
-        
-        if uploaded_file:
-            app_usage['file_name'] = uploaded_file.name
-            app_usage['file_size'] = len(uploaded_file.getvalue())
-        
-        if distributions_selected:
-            app_usage['distributions_selected'] = list(distributions_selected)
-            app_usage['distributions_count'] = len(distributions_selected)
-        
-        if custom_ensurence_value is not None:
-            app_usage['custom_ensurence_value'] = float(custom_ensurence_value)
-        
-        try:
-            with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(analytics_data, f, ensure_ascii=False, indent=2)
-        except:
-            pass
-        
-        content = json.dumps(analytics_data, ensure_ascii=False, indent=2)
-        commit_to_github(content)
+        # Отправляем обновление
+        response = requests.put(url, headers=headers, json=data)
+        return response.status_code in [200, 201]
         
     except Exception as e:
-        pass
+        return False
 
-def update_visit_file_rows(file_rows):
-    """Обновляет количество строк в последнем посещении текущей сессии"""
+def update_file_rows_in_github(file_rows):
+    """Обновляет количество строк в CSV"""
     try:
+        token = get_github_token()
+        if not token:
+            return False
+        
         session_id = get_session_id()
         
-        analytics_data = load_from_github()
-        if analytics_data is None:
-            if os.path.exists(ANALYTICS_FILE):
-                try:
-                    with open(ANALYTICS_FILE, 'r', encoding='utf-8') as f:
-                        analytics_data = json.load(f)
-                except:
-                    return
-            else:
-                return
+        url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/analytics.csv"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
         
-        for visit in reversed(analytics_data.get('visits', [])):
-            if visit.get('session_id') == session_id:
-                if 'app_usage' in visit:
-                    visit['app_usage']['file_rows'] = file_rows
-                break
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            return False
         
-        try:
-            with open(ANALYTICS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(analytics_data, f, ensure_ascii=False, indent=2)
-        except:
-            pass
+        file_data = response.json()
+        content = base64.b64decode(file_data['content']).decode('utf-8')
+        lines = content.split('\n')
         
-        content = json.dumps(analytics_data, ensure_ascii=False, indent=2)
-        commit_to_github(content)
-    except:
-        pass
+        # Ищем последнюю запись этой сессии
+        for i in range(len(lines)-1, 0, -1):
+            if session_id in lines[i]:
+                parts = lines[i].split(',')
+                if len(parts) >= 6:
+                    parts[5] = str(file_rows)
+                    lines[i] = ','.join(parts)
+                    break
+        
+        # Сохраняем
+        new_content = '\n'.join(lines)
+        data = {
+            "message": f"Update file rows",
+            "content": base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
+            "sha": file_data['sha'],
+            "branch": GITHUB_BRANCH
+        }
+        
+        response = requests.put(url, headers=headers, json=data)
+        return response.status_code in [200, 201]
+        
+    except Exception as e:
+        return False
 
-def log_visit_once_per_session():
-    """Логирует посещение только один раз за сессию при загрузке страницы"""
-    if not is_real_user():
-        return
-    
-    if 'visit_logged' not in st.session_state:
-        st.session_state.visit_logged = True
+def log_analytics(uploaded_file=None, distributions_selected=None, custom_ensurence_value=None):
+    """Логирует аналитику при загрузке файла"""
+    if uploaded_file:
+        return append_to_github_csv(
+            uploaded_file=uploaded_file,
+            distributions_selected=distributions_selected,
+            custom_ensurence_value=custom_ensurence_value
+        )
+    return False
+
+def update_analytics_file_rows(file_rows):
+    """Обновляет количество строк"""
+    return update_file_rows_in_github(file_rows)
+
 # ==================== КОНЕЦ СИСТЕМЫ АНАЛИТИКИ ====================
 
 st.set_page_config(
@@ -414,9 +353,9 @@ if uploaded_file:
                 return "строк"  # 0, 5-20, 25-30 и т.д.
         st.success(f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}")
         # Логируем загрузку файла
-        log_visit(uploaded_file=uploaded_file)
+        log_analytics(uploaded_file=uploaded_file)
         # Обновляем количество строк после обработки
-        update_visit_file_rows(len(df))
+        update_analytics_file_rows(len(df))
         with st.expander("# 🔢 Фрагмент загруженных данных", expanded=False):
             st.markdown(df.head().to_html(), unsafe_allow_html=True)
 
@@ -650,7 +589,7 @@ if uploaded_file:
             )
             # Логируем выбор распределений
             if distributions_to_plot:
-                log_visit(uploaded_file=uploaded_file, 
+                log_analytics(uploaded_file=uploaded_file, 
                          distributions_selected=distributions_to_plot)
 
             # инициализация функции для изменения масштаба по горизонтальной оси
@@ -879,7 +818,7 @@ if uploaded_file:
                 )
                 # Логируем ввод значения обеспеченности (только если значение изменилось)
                 if 'last_logged_p' not in st.session_state or st.session_state.last_logged_p != p:
-                    log_visit(uploaded_file=uploaded_file,
+                    log_analytics(uploaded_file=uploaded_file,
                              distributions_selected=distributions_to_plot,
                              custom_ensurence_value=p)
                     st.session_state.last_logged_p = p
