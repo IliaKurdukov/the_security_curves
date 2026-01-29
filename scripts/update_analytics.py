@@ -159,7 +159,7 @@ def update_readme_with_analytics():
     today = datetime.now().strftime("%d.%m.%Y %H:%M")
     
     analytics_section = f"""<!-- START_ANALYTICS -->
-## 📊 Аналитика использования
+## 📊 Аналитика использования с 25.01.2026
 
 **Обновлено:** {today} МСК 
 
@@ -171,7 +171,6 @@ def update_readme_with_analytics():
 {mermaid_dist}
 ```
 
-*📈 Графики обновляются автоматически каждый день в 03:00 МСК*
 <!-- END_ANALYTICS -->"""
     
     # Читаем текущий README
@@ -219,4 +218,3 @@ def commit_changes():
 
 if __name__ == '__main__':
     update_readme_with_analytics()
-```
