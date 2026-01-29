@@ -8,3 +8,4 @@ date,time,session_id,file_name,file_size,file_rows,distributions_selected,distri
 2026-01-29,15:24:31,d8d77bac-32d0-4aa6-822a-f9d18137a5d2,Уровни.xlsx,10848,None,['Обобщенное (L-мом)'],1,None
 2026-01-29,15:24:32,d8d77bac-32d0-4aa6-822a-f9d18137a5d2,Уровни.xlsx,10848,None,['Обобщенное (L-мом)'],1,0.001
 2026-01-29,15:24:34,d8d77bac-32d0-4aa6-822a-f9d18137a5d2,Уровни.xlsx,10848,62,[],0,None
+2026-01-29,15:24:36,d8d77bac-32d0-4aa6-822a-f9d18137a5d2,Уровни.xlsx,10848,None,['Обобщенное (L-мом)', 'Крицкого-Менкеля (ММП)'],2,None
