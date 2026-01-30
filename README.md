@@ -54,13 +54,14 @@ xychart-beta
     'width': 40,
     'height': 30,
     'showDataLabel': true,
+    'chartOrientation': 'horizontal',
     'plotColorPalette': '#3572a5'
   }
 }}}%%
 xychart-beta
     title "📊 Самые распростаненные распределения"
     x-axis ["Обобщенное (L-мом)", "Пирсона 3 типа (ММП)", "Крицкого-Менкеля (ММП)", "Пирсона 3 типа (L-мом)", "Обобщенное (ММП)", "Гумбеля (ММП)", "Гумбеля (L-мом)", "Гумбеля (Мом)"]
-    y-axis ""
+    y-axis "" 0 --> max
     bar [5, 4, 3, 2, 2, 2, 2, 1]
 
 ```
