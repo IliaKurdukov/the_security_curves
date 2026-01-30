@@ -102,7 +102,7 @@ def generate_distributions_mermaid(df):
     mermaid_code = f"""xychart-beta
     title "📊 Самые распростаненные распределения"
     x-axis [{", ".join(categories)}]
-    y-axis "" 0 --> max
+    y-axis "" 0 --> {max(values)+1}
     bar [{", ".join(values)}]
 """
     return mermaid_code
