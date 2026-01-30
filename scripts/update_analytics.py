@@ -97,12 +97,14 @@ def generate_distributions_mermaid(df):
     for dist, count in top_dist.head(8).items():
         categories.append(f'"{dist}"')
         values.append((count))
+    max_value = max(values)
+    values = [str(value) for value in values]
 
     # ВАЖНО: Возвращаем ЧИСТЫЙ код диаграммы, без обратных кавычек.
     mermaid_code = f"""xychart-beta
     title "📊 Самые распростаненные распределения"
     x-axis [{", ".join(categories)}]
-    y-axis "" 0 --> {max(values)+1}
+    y-axis "" 0 --> {max_value}
     bar [{", ".join(values)}]
 """
     return mermaid_code
