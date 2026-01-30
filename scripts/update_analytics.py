@@ -147,7 +147,7 @@ def update_readme_with_analytics():
     'showDataLabel': true,
     'plotColorPalette': '#3572a5'
   }}
-}}}}}%%
+}}}}}}%%
 {mermaid_daily}
 ```
 
