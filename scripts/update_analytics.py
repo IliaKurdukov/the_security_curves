@@ -140,10 +140,14 @@ def update_readme_with_analytics():
     analytics_section = f"""<!-- START_ANALYTICS -->
 
 ```mermaid
-%%{{init: {{'config': {{'width': 30, 
-                        'height': 20,
-                        'showDataLabel': true,
-                        'themeVariables': {{plotColorPalette: '#3572a5'}}}}}}}}%%
+%%{{init: {{'config': {{
+  'xychart': {{
+    'width': 400,
+    'height': 300,
+    'showDataLabel': true,
+    'plotColorPalette': '#3572a5'
+  }}
+}}}}}%%
 {mermaid_daily}
 ```
 
