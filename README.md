@@ -32,11 +32,14 @@ the_security_curves/
 <!-- START_ANALYTICS -->
 
 ```mermaid
-%%{init: {'theme': 'base', 'config': {'width': 300, 'height': 200, 'showDataLabel': true}}}%%
+%%{init: {'config': {'width': 30, 
+                        'height': 20,
+                        'showDataLabel': true,
+                        'themeVariables': {plotColorPalette: '#3572a5'}}}}%%
 xychart-beta
     title "📈 Динамика использований"
     x-axis ["25.01", "26.01", "28.01", "29.01", "30.01"]
-    y-axis "Использований" 0 --> 5
+    y-axis "" 0 --> 5
     line [1, 1, 3, 1, 1]
 
 ```
