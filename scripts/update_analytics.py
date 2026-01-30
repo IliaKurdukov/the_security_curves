@@ -96,7 +96,7 @@ def generate_distributions_mermaid(df):
     values = []
     for dist, count in top_dist.head(8).items():
         categories.append(f'"{dist}"')
-        values.append(str(count))
+        values.append((count))
 
     # ВАЖНО: Возвращаем ЧИСТЫЙ код диаграммы, без обратных кавычек.
     mermaid_code = f"""xychart-beta
