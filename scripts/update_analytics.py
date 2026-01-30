@@ -99,9 +99,11 @@ def generate_distributions_mermaid(df):
         values.append(str(count))
 
     # ВАЖНО: Возвращаем ЧИСТЫЙ код диаграммы, без обратных кавычек.
-    mermaid_code = f"""bar
-    title "📊 Топ распределений"
-    x-axis "{", ".join(categories)}" [{", ".join(values)}]
+    mermaid_code = f"""xychart-beta
+    title "📊 Самые распростаненные распределения"
+    x-axis [{", ".join(categories)}]
+    y-axis ""
+    bar [{", ".join(values)}]
 """
     return mermaid_code
 
@@ -152,6 +154,14 @@ def update_readme_with_analytics():
 ```
 
 ```mermaid
+%%{{init: {{'config': {{
+  'xychart': {{
+    'width': 40,
+    'height': 30,
+    'showDataLabel': true,
+    'plotColorPalette': '#3572a5'
+  }}
+}}}}}}%%
 {mermaid_dist}
 ```
 
