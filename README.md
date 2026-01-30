@@ -32,8 +32,9 @@ the_security_curves/
 <!-- START_ANALYTICS -->
 
 ```mermaid
+%%{init: {'theme': 'base', 'config': {'width': 300, 'height': 200, 'showDataLabel': true}}}%%
 xychart-beta
-    title "📈 Активность за последние 15 дней"
+    title "📈 Динамика использований"
     x-axis ["25.01", "26.01", "28.01", "29.01", "30.01"]
     y-axis "Использований" 0 --> 5
     line [1, 1, 3, 1, 1]
