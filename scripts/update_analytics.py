@@ -73,7 +73,7 @@ def generate_daily_activity_mermaid(df):
     mermaid_code = f"""xychart-beta
     title "📈 Динамика использований"
     x-axis [{", ".join(dates_formatted)}]
-    y-axis "Использований" 0 --> {max(daily_counts['count'].max(), 5)}
+    y-axis "" 0 --> {max(daily_counts['count'].max(), 5)}
     line [{", ".join(map(str, daily_counts['count']))}]
 """
     return mermaid_code
@@ -140,7 +140,10 @@ def update_readme_with_analytics():
     analytics_section = f"""<!-- START_ANALYTICS -->
 
 ```mermaid
-%%{{init: {{'theme': 'base', 'config': {{'width': 300, 'height': 200, 'showDataLabel': true}}}}}}%%
+%%{{init: {{'config': {{'width': 30, 
+                        'height': 20,
+                        'showDataLabel': true,
+                        'themeVariables': {{plotColorPalette: '#3572a5'}}}}}}}}%%
 {mermaid_daily}
 ```
 
