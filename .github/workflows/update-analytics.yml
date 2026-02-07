@@ -34,7 +34,24 @@ jobs:
       run: |
         python scripts/update_analytics.py
         
+    - name: Check for changes
+      id: check_changes
+      run: |
+        # Проверяем есть ли изменения в README.md или папке graphs
+        if git diff --quiet README.md graphs/ 2>/dev/null; then
+          echo "changes=false" >> $GITHUB_OUTPUT
+          echo "Нет изменений для коммита"
+        else
+          echo "changes=true" >> $GITHUB_OUTPUT
+          echo "Есть изменения для коммита"
+          
+          # Показываем какие именно изменения
+          echo "Изменения в файлах:"
+          git status --porcelain
+        fi
+        
     - name: Commit and push changes
+      if: steps.check_changes.outputs.changes == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -42,13 +59,10 @@ jobs:
         git config --local user.email "actions@github.com"
         git config --local user.name "GitHub Actions"
         
-        # Проверяем есть ли изменения в README.md
-        if git diff --quiet README.md; then
-          echo "Нет изменений в README.md"
-        else
-          # Коммитим и пушим
-          git add README.md
-          git commit -m "📊 Обновление аналитики $(date +'%Y-%m-%d')"
-          git push
-          echo "Изменения закоммичены"
-        fi
+        # Добавляем ВСЕ изменения (README.md и графики)
+        git add README.md graphs/
+        
+        # Коммитим и пушим
+        git commit -m "📊 Обновление аналитики $(date +'%Y-%m-%d')"
+        git push
+        echo "Изменения закоммичены"
