@@ -57,17 +57,24 @@ def parse_distributions_list(dist_str):
 
 def create_daily_activity_graph(df):
     """Создает график активности по дням"""
+    # Преобразуем столбец date в datetime
     df['datetime'] = pd.to_datetime(df['date'])
     
-    # Определяем вчерашнюю дату
-    yesterday = datetime.now().date() - timedelta(days=1)
+    # Определяем вчерашнюю дату как datetime
+    yesterday = datetime.now() - timedelta(days=1)
+    yesterday_date = yesterday.date()
     
     # Создаем полный диапазон дат: от "15 дней назад" до "вчера"
-    date_range = pd.date_range(end=yesterday, periods=15, freq='D')
+    date_range = pd.date_range(end=yesterday_date, periods=15, freq='D')
     
-    # Группируем по дате (используем тот же cutoff_date для фильтрации df)
+    # Группируем по дате - используем cutoff_date как datetime для сравнения
     cutoff_date = yesterday - timedelta(days=14)  # 15 дней назад (14 + вчера = 15)
-    daily_counts = df[df['datetime'] >= cutoff_date].groupby('date').size().reset_index(name='count')
+    
+    # Преобразуем cutoff_date в тот же тип, что и df['datetime']
+    cutoff_date_dt = pd.Timestamp(cutoff_date)
+    
+    # Фильтруем и группируем
+    daily_counts = df[df['datetime'] >= cutoff_date_dt].groupby('date').size().reset_index(name='count')
     daily_counts['date'] = pd.to_datetime(daily_counts['date'])
     
     # Создаем полный DataFrame с всеми датами, заполняя отсутствующие нулями
@@ -95,7 +102,7 @@ def create_daily_activity_graph(df):
             markersize=4,
             color='#3572a5')
     
-    # Настройка внешнего вида
+    # Настройка внешнего вида - заголовок сдвинут влево
     ax.set_title('Динамика количества использований по дням')
     
     # Устанавливаем подписи на оси X
