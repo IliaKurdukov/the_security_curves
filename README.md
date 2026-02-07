@@ -19,12 +19,16 @@
 
 📂 **Структура проекта**
 
-the_security_curves/  
-├── hidrodata.py                             # Основной скрипт Streamlit  
-├── LICENSE                                  # Лицензия  
-├── requirements.txt                         # Зависимости  
-├── README.md                                # Этот файл  
-├── analytics.csv                            # Логи использования приложения 
+the_security_curves/
+├── .github/workflows/        # Автоматизация GitHub Actions (обновление аналитики)
+├── scripts/                  # Вспомогательные скрипты
+│   └── update_analytics.py   # Скрипт для генерации графиков и обновления README
+├── graphs/                   # Папка с генерируемыми графиками аналитики
+├── hidrodata.py              # Главный скрипт приложения Streamlit
+├── analytics.csv             # Логи использования приложения
+├── requirements.txt          # Зависимости Python
+├── LICENSE                   # Лицензия
+└── README.md                 # Этот файл
 
 📊 **Аналитика использования приложения**
 
