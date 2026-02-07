@@ -18,7 +18,12 @@ from pathlib import Path
 
 # Настройка matplotlib для работы без GUI
 matplotlib.use('Agg')
-plt.style.use('seaborn-v0_8-darkgrid')
+
+# Устанавливаем белый фон по умолчанию
+plt.rcParams['figure.facecolor'] = 'white'
+plt.rcParams['axes.facecolor'] = 'white'
+plt.rcParams['savefig.facecolor'] = 'white'
+plt.rcParams['savefig.edgecolor'] = 'none'
 
 # Конфигурация
 GITHUB_REPO_OWNER = "IliaKurdukov"
