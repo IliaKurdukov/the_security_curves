@@ -58,54 +58,60 @@ def parse_distributions_list(dist_str):
 def create_daily_activity_graph(df):
     """Создает график активности по дням"""
     df['datetime'] = pd.to_datetime(df['date'])
-    cutoff_date = datetime.now() - timedelta(days=15)
-    df_recent = df[df['datetime'] >= cutoff_date]
-
-    daily_counts = df_recent.groupby('date').size().reset_index(name='count')
-    daily_counts = daily_counts.sort_values('date')
     
-    if daily_counts.empty:
-        return False
+    # Определяем вчерашнюю дату
+    yesterday = datetime.now().date() - timedelta(days=1)
+    
+    # Создаем полный диапазон дат: от "15 дней назад" до "вчера"
+    date_range = pd.date_range(end=yesterday, periods=15, freq='D')
+    
+    # Группируем по дате (используем тот же cutoff_date для фильтрации df)
+    cutoff_date = yesterday - timedelta(days=14)  # 15 дней назад (14 + вчера = 15)
+    daily_counts = df[df['datetime'] >= cutoff_date].groupby('date').size().reset_index(name='count')
+    daily_counts['date'] = pd.to_datetime(daily_counts['date'])
+    
+    # Создаем полный DataFrame с всеми датами, заполняя отсутствующие нулями
+    full_dates = pd.DataFrame({'date': date_range})
+    full_counts = pd.merge(full_dates, daily_counts, on='date', how='left').fillna(0)
+    full_counts = full_counts.sort_values('date')
     
     # Форматируем даты для отображения
-    dates_display = [datetime.strptime(d, '%Y-%m-%d').strftime('%d.%m') 
-                     for d in daily_counts['date']]
+    dates_display = [d.strftime('%d.%m') for d in full_counts['date']]
     
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(8, 4))
     
-    # Создаем line plot с улучшенным дизайном
+    # Убираем границы
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    
+    # Убираем ось Y (левую вертикальную)
+    ax.yaxis.set_visible(False)
+    
+    # Создаем line plot
     x = np.arange(len(dates_display))
-    ax.plot(x, daily_counts['count'], 
+    ax.plot(x, full_counts['count'], 
             marker='o', 
-            linewidth=3, 
-            markersize=8,
-            color='#3572a5',
-            markerfacecolor='white',
-            markeredgewidth=2,
-            markeredgecolor='#3572a5')
+            markersize=4,
+            color='#3572a5')
     
     # Настройка внешнего вида
-    ax.set_title('📈 Динамика использований', fontsize=16, fontweight='bold', pad=20)
-    ax.set_xlabel('Дата', fontsize=12)
-    ax.set_ylabel('Количество использований', fontsize=12)
+    ax.set_title('Динамика количества использований по дням')
     
     # Устанавливаем подписи на оси X
     ax.set_xticks(x)
     ax.set_xticklabels(dates_display, rotation=45, ha='right')
     
-    # Добавляем сетку
-    ax.grid(True, alpha=0.3, linestyle='--')
-    
     # Настройка пределов оси Y
-    y_max = max(daily_counts['count'].max(), 5)
-    ax.set_ylim(bottom=0, top=y_max * 1.1)
+    y_max = max(full_counts['count'].max(), 5)
+    ax.set_ylim(bottom=0, top=y_max * 1.1) 
     
-    # Добавляем значения над точками
-    for i, v in enumerate(daily_counts['count']):
-        ax.text(i, v + (y_max * 0.02), str(v), 
-                ha='center', 
-                fontweight='bold',
-                fontsize=10)
+    # Добавляем значения над точками, пропуская нули
+    for i, v in enumerate(full_counts['count']):
+        if v > 0:  # Только для ненулевых значений
+            ax.text(i, v + (y_max * 0.05), str(int(v)), 
+                    ha='center',
+                    fontsize=10)
     
     plt.tight_layout()
     
@@ -126,55 +132,56 @@ def create_distributions_graph(df):
     for dist_str in df['distributions_selected'].dropna():
         distributions = parse_distributions_list(dist_str)
         all_distributions.extend(distributions)
-    
+
     if not all_distributions:
         return False
-    
+
     dist_counts = Counter(all_distributions)
-    top_dist = pd.Series(dist_counts).sort_values(ascending=False).head(8)
-    
+    top_dist = pd.Series(dist_counts).sort_values(ascending=True)
+
     if top_dist.empty:
         return False
-    
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    # Убираем границы
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+
+    # Убираем ось X
+    ax.xaxis.set_visible(False)
+
     # Создаем горизонтальный bar plot
     y_pos = np.arange(len(top_dist))
     bars = ax.barh(y_pos, top_dist.values, 
                    color='#3572a5',
-                   edgecolor='white',
-                   linewidth=2,
                    height=0.6)
-    
+
     # Настройка внешнего вида
-    ax.set_title('📊 Самые распространенные распределения', 
-                 fontsize=16, 
-                 fontweight='bold', 
-                 pad=20)
-    ax.set_xlabel('Количество использований', fontsize=12)
-    
+    ax.set_title('Самые распространенные распределения (кол-во использований)', x=0.35))
+
     # Устанавливаем подписи на оси Y
     ax.set_yticks(y_pos)
     ax.set_yticklabels(top_dist.index)
     
-    # Добавляем сетку
-    ax.grid(True, alpha=0.3, linestyle='--', axis='x')
-    
+    # Убираем черточки (ticks) на оси Y
+    ax.tick_params(axis='y', length=0)
+
     # Добавляем значения в концы столбцов
     for i, (bar, value) in enumerate(zip(bars, top_dist.values)):
         width = bar.get_width()
         ax.text(width + (max(top_dist.values) * 0.01), 
                 bar.get_y() + bar.get_height()/2,
                 str(value),
-                va='center',
-                fontweight='bold',
-                fontsize=10)
-    
+                va='center')
+
     # Автонастройка пределов оси X
-    ax.set_xlim(left=0, right=max(top_dist.values) * 1.15)
-    
+    ax.set_xlim(left=0, right=max(top_dist.values) * 1.1)
+
     plt.tight_layout()
-    
+
     # Сохраняем график
     GRAPHS_DIR.mkdir(exist_ok=True)
     plt.savefig(GRAPHS_DIR / 'distributions.png', 
@@ -207,18 +214,17 @@ def update_readme_with_analytics():
     today = datetime.now().strftime("%d.%m.%Y %H:%M")
     
     analytics_section = f"""<!-- START_ANALYTICS -->
-> 📅 Последнее обновление: {today}
 
 """
     
     if daily_created:
-        analytics_section += """### 📈 Динамика использований
+        analytics_section += """
 ![Динамика использований](graphs/daily_activity.png)
 
 """
     
     if dist_created:
-        analytics_section += """### 📊 Самые распространенные распределения
+        analytics_section += """
 ![Популярные распределения](graphs/distributions.png)
 
 """
