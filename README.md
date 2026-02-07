@@ -20,15 +20,15 @@
 📂 **Структура проекта**
 
 the_security_curves/  
-├── .github/workflows/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Автоматизация GitHub Actions (обновление аналитики)  
-├── scripts/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Вспомогательные скрипты  
-│   └── update_analytics.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Скрипт для генерации графиков и обновления README  
-├── graphs/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Папка с генерируемыми графиками аналитики  
-├── hidrodata.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Главный скрипт приложения Streamlit  
-├── analytics.csv&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Логи использования приложения  
-├── requirements.txt&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Зависимости Python  
-├── LICENSE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Лицензия  
-└── README.md&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# Этот файл  
+├── .github/workflows/  # Автоматизация GitHub Actions (обновление аналитики)  
+├── scripts/  # Вспомогательные скрипты  
+│   └── update_analytics.py  # Скрипт для генерации графиков и обновления README  
+├── graphs/  # Папка с генерируемыми графиками аналитики  
+├── hidrodata.py  # Главный скрипт приложения Streamlit  
+├── analytics.csv  # Логи использования приложения  
+├── requirements.txt  # Зависимости Python  
+├── LICENSE  # Лицензия  
+└── README.md  # Этот файл  
 
 📊 **Аналитика использования приложения**
 
