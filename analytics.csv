@@ -34,4 +34,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-02-13;15:43:47;df2ab0c4-1010-4daa-b519-e0e5e4d1d27f;Лист Microsoft Excel.xlsx;9323;70;[];0;[]
 2026-02-13;15:48:04;fe4cb686-9d5c-47be-af4d-2d0a703f4801;2.xlsx;9100;70;[];0;[]
 2026-02-13;16:02:22;a4fe0a18-8f4a-4cca-aeb4-9d0acaaa7f8e;Лист Microsoft Excel (2).xlsx;9679;70;[Пирсона 3 типа (ММП), Пирсона 3 типа (L-мом)];2;[0.01]
-2026-02-18;10:13:19;9581bf28-c5ad-4fc0-9a6f-fe8a0db1a9ed;Лист Microsoft Excel.xlsx;6570;52;[];0;[]
+2026-02-18;10:13:21;9581bf28-c5ad-4fc0-9a6f-fe8a0db1a9ed;Лист Microsoft Excel.xlsx;6570;52;[Обобщенное (L-мом)];1;[]
