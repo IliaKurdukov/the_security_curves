@@ -475,7 +475,7 @@ if uploaded_file:
                  ax.set_title(f"График хода значений", fontsize=6)
                  ax.tick_params(axis='x', labelsize=5)
                  ax.tick_params(axis='y', labelsize=5)
-                 st.pyplot(fig, width=False)
+                 st.pyplot(fig, width='content')
 
             data = data.sort_values(by=values_col)
 
@@ -866,7 +866,7 @@ if uploaded_file:
             ax.tick_params(axis='x', labelsize=5)
             ax.tick_params(axis='y', labelsize=5)
             legend = ax.legend(fontsize=5)
-            st.pyplot(fig, width=False)
+            st.pyplot(fig, width='content')
 
             with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
                 df_1 = df_1.T
