@@ -743,8 +743,8 @@ if uploaded_file:
                 distribution_params[distribution] = params
                 
                 predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-                st.markdown(data['Вероятность'])
-                st.markdown(data[values_col].to_html(index=True, header=False), unsafe_allow_html=True)
+                st.table(data['Вероятность'])
+                st.table(data[values_col])
                 r2 = r2_score(data[values_col], predict)
                 mae = mean_absolute_error(data[values_col], predict)
                 maxE = max_error(data[values_col], predict)
