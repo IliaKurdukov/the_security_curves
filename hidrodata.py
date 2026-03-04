@@ -417,7 +417,7 @@ if uploaded_file:
         log_analytics(uploaded_file=uploaded_file)
         # Обновляем количество строк после обработки
         update_analytics_file_rows(len(df))
-        with st.expander("# 🔢 Фрагмент загруженных данных", expanded=False):
+        with st.expander("🔢 Фрагмент загруженных данных", expanded=False):
             st.markdown(df.head().to_html(), unsafe_allow_html=True)
 
         # Автоматическое определение столбцов
@@ -435,7 +435,7 @@ if uploaded_file:
                 aggfunc = st.selectbox("Выберите способ группировки данных", ['Максимальные значения', 'Средние значения', 'Минимальные значения'])
                 df.rename(columns={index_col: str(index_col)}, inplace=True)
             
-            with st.expander("# 🔢 Хронологический ряд значений и эмпирическое распределение", expanded=False):
+            with st.expander("🔢 Хронологический ряд значений и эмпирическое распределение", expanded=False):
                 if index_col != 'Без группировки':
                     aggfunc_dict = {'Максимальные значения': 'max', 'Средние значения': 'mean', 'Минимальные значения': 'min'}
                     data = df.pivot_table(index = index_col, values = values_col, aggfunc = aggfunc_dict[aggfunc])
@@ -444,7 +444,6 @@ if uploaded_file:
                 data = pd.DataFrame(data)
                 scaler = data.mean()
                 n = len(data)
-                # Оптимизация: создаем ранг сразу с правильными значениями
                 data['Ранг'] = np.arange(1, n + 1)
                 max_rank_plus_one = n + 1
                 data['Вероятность'] = data['Ранг'] / max_rank_plus_one
@@ -466,7 +465,7 @@ if uploaded_file:
                 else:
                     st.markdown(data[[values_col, 'Обеспеченность P, %', values_col + ' (P)']].to_html(), unsafe_allow_html=True)
                 
-            with st.expander("# 📊 График хода значений", expanded=False):
+            with st.expander("📊 График хода значений", expanded=False):
                  fig, ax = plt.subplots(figsize=(4, 2))
                  x = data[index_col] if index_col != 'Без группировки' else data.index
                  y = data[values_col]
@@ -743,8 +742,6 @@ if uploaded_file:
                 distribution_params[distribution] = params
                 
                 predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-                st.table(data['Вероятность'])
-                st.table(data[values_col])
                 r2 = r2_score(data[values_col], predict)
                 mae = mean_absolute_error(data[values_col], predict)
                 maxE = max_error(data[values_col], predict)
@@ -868,7 +865,7 @@ if uploaded_file:
             legend = ax.legend(fontsize=5)
             st.pyplot(fig, width='content')
 
-            with st.expander("# 📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
+            with st.expander("📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False):
                 df_1 = df_1.T
                 st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
 
@@ -896,7 +893,7 @@ if uploaded_file:
                 custom_df = pd.DataFrame.from_dict(custom_dict, orient='index', columns=['Values'])
                 st.markdown(custom_df.to_html(index=True, header=False), unsafe_allow_html=True)
             
-            with st.expander("# 📋 Параметры и метрики качества полученных распределений", expanded=False):
+            with st.expander("📋 Параметры и метрики качества полученных распределений", expanded=False):
                 def get_green_red_gradient_color(value):
                     if value <= 0.5:
                         # Зеленый (#63be7b) → Прозрачный
