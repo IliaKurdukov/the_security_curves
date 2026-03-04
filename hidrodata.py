@@ -743,11 +743,11 @@ if uploaded_file:
                 distribution_params[distribution] = params
                 
                 predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-                # st.markdown(predict)
-                # st.markdown(data[values_col])
-                r2 = r2_score(data[values_col], predict)
-                mae = mean_absolute_error(data[values_col], predict)
-                maxE = max_error(data[values_col], predict)
+                st.markdown(predict)
+                st.markdown(data[values_col])
+                r2 = 1# r2_score(data[values_col], predict)
+                mae =1# mean_absolute_error(data[values_col], predict)
+                maxE =1# max_error(data[values_col], predict)
                 
                 # Расчет A-D статистики и сохранение распределения для дальнейшего использования
                 try:
