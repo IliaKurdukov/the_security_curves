@@ -742,9 +742,9 @@ if uploaded_file:
                 distribution_params[distribution] = params
                 
                 predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
-                r2 = r2_score(data[values_col], predict)
-                mae = mean_absolute_error(data[values_col], predict)
-                maxE = max_error(data[values_col], predict)
+                r2 = r2_score(data[values_col + ' (P)'], predict)
+                mae = mean_absolute_error(data[values_col + ' (P)'], predict)
+                maxE = max_error(data[values_col + ' (P)'], predict)
                 
                 # Расчет A-D статистики и сохранение распределения для дальнейшего использования
                 try:
