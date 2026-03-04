@@ -742,7 +742,7 @@ if uploaded_file:
                 params = selected_dist.fit(data[values_col])
                 distribution_params[distribution] = params
                 
-                predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params))
+                predict = data['Вероятность'].apply(lambda x: selected_dist.ppf(1-x, *params)) * scaler
                 r2 = r2_score(data[values_col], predict)
                 mae = mean_absolute_error(data[values_col], predict)
                 maxE = max_error(data[values_col], predict)
