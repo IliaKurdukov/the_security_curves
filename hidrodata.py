@@ -689,8 +689,8 @@ if uploaded_file:
             n = len(data)
             def доверительные_границы(n, m, дов_вер=0.9):
                 alpha = 1 - дов_вер
-                p_lower = beta.ppf(1 - alpha/2, m, n - m + 1) * 100
-                p_upper = beta.ppf(alpha/2, m, n - m + 1) * 100
+                p_lower = stats.beta.ppf(1 - alpha/2, m, n - m + 1) * 100
+                p_upper = stats.beta.ppf(alpha/2, m, n - m + 1) * 100
                 return p_lower, p_upper
             # Находим индексы крайних точек
             idx_max = 0  # индекс максимума (первая точка)
