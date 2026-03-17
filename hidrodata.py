@@ -58,6 +58,9 @@ GITHUB_REPO_NAME = "the_security_curves"
 GITHUB_BRANCH = "main"
 CSV_SEPARATOR = ";"  # Новый разделитель вместо запятой
 
+# Список тестовых файлов, которые не должны логироваться
+TEST_FILES = ["тест.xlsx"]
+
 def get_session_id():
     if 'session_id' not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
@@ -110,6 +113,12 @@ def save_to_github(token, sha, content):
     except:
         return False
 
+def is_test_file(filename):
+    """Проверяет, является ли файл тестовым"""
+    if not filename:
+        return False
+    return any(test_file.lower() in filename.lower() for test_file in TEST_FILES)
+
 def format_list_for_csv(items):
     """Форматирует список в строку для CSV"""
     if not items:
@@ -133,6 +142,10 @@ def log_analytics(uploaded_file=None, distributions_selected=None, custom_ensure
     try:
         token = get_github_token()
         if not token or not uploaded_file:
+            return False
+        
+        # ПРОВЕРКА: если файл тестовый - НЕ логируем
+        if is_test_file(uploaded_file.name):
             return False
         
         session_id = get_session_id()
@@ -258,8 +271,14 @@ def update_analytics_file_rows(file_rows):
             if lines[i].strip() and session_id in lines[i]:
                 parts = lines[i].split(CSV_SEPARATOR)
                 if len(parts) > 5:
-                    parts[5] = str(file_rows)
-                    lines[i] = CSV_SEPARATOR.join(parts)
+                    # Проверяем, не тестовый ли это файл
+                    if len(parts) > 3 and is_test_file(parts[3]):
+                        # Если это тестовый файл, просто удаляем запись
+                        lines.pop(i)
+                    else:
+                        # Иначе обновляем количество строк
+                        parts[5] = str(file_rows)
+                        lines[i] = CSV_SEPARATOR.join(parts)
                     break
         
         # Сохраняем обратно
