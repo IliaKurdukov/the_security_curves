@@ -686,44 +686,6 @@ if uploaded_file:
                         facecolors='none', # без заливки
                         edgecolors='black', # черный контур
                         linewidths=0.5)    # толщина контура
-            n = len(data)
-            def доверительные_границы(n, m, дов_вер=0.9):
-                alpha = 1 - дов_вер
-                p_lower = stats.beta.ppf(1 - alpha/2, m, n - m + 1) * 100
-                p_upper = stats.beta.ppf(alpha/2, m, n - m + 1) * 100
-                return p_lower, p_upper
-            # Находим индексы крайних точек
-            idx_max = 0  # индекс максимума (первая точка)
-            idx_min = -1  # индекс минимума (последняя точка)
-            # Получаем значения y для крайних точек
-            y_max = y.iloc[idx_max] if hasattr(y, 'iloc') else y[idx_max]
-            y_min = y.iloc[idx_min] if hasattr(y, 'iloc') else y[idx_min]
-            
-            # Рассчитываем доверительные границы для максимума (m=1)
-            p_lower_max, p_upper_max = доверительные_границы(n, m=1)
-            # Рисуем усы для максимума (самая левая точка)
-            plt.hlines(y=y_max, 
-                       xmin=p_upper_max,  # левая граница уса (5% вероятность)
-                       xmax=p_lower_max,  # правая граница уса (95% вероятность)
-                       colors='black', 
-                       linewidth=0.5,
-                       linestyles='-')
-            # Добавляем вертикальные ограничители на концах уса (опционально)
-            plt.plot([p_upper_max, p_upper_max], [y_max, y_max], 'r|', markersize=5)
-            plt.plot([p_lower_max, p_lower_max], [y_max, y_max], 'r|', markersize=5)
-            
-            # Рассчитываем доверительные границы для минимума (m=n)
-            p_lower_min, p_upper_min = доверительные_границы(n, m=n)
-            # Рисуем усы для минимума (самая правая точка)
-            plt.hlines(y=y_min,
-                       xmin=p_lower_min,  # левая граница уса (95% вероятность для минимума)
-                       xmax=p_upper_min,  # правая граница уса (5% вероятность для минимума)
-                       colors='black',
-                       linewidth=0.5,
-                       linestyles='-')
-            # Добавляем вертикальные ограничители
-            plt.plot([p_lower_min, p_lower_min], [y_min, y_min], 'r|', markersize=5)
-            plt.plot([p_upper_min, p_upper_min], [y_min, y_min], 'r|', markersize=5)
 
             # таблица значений с разной обеспеченностью
             percent_list_1 = [0.01, 0.1, 0.33, 0.5, 1, 2, 3, 5, 10, 50, 63, 90, 95, 98, 99, 99.9]
