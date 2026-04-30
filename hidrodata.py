@@ -373,7 +373,6 @@ def log_likelihood(params, data):
     return total
 
 def km_fit(data, initial_params = [2, 1, 1]):
-    data = data / data.mean()
     result = minimize(
         lambda params: -log_likelihood(params, data),
         initial_params,
