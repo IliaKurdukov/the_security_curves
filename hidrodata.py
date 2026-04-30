@@ -575,7 +575,7 @@ if uploaded_file:
             data_max = data[values_col].max()
             
             # Функция PPF для Крицкого-Менкеля (нужна для адаптера)
-            def km_ppf(p, γ, a, b, data_min, data_max):
+            def km_ppf(p, γ, a, b, data_min=data_min, data_max=data_max):
                 left = data_min * 0.5
                 right = data_max * 2
                 
