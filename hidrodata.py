@@ -348,10 +348,12 @@ def smart_read_excel(uploaded_file):
 
 # Функции для распределения Крицкого-Менкеля
 def km_pdf(k, γ, a, b):
-    return γ**γ / (a**(γ/b) * math.gamma(γ) * b) * math.exp(-γ*(k/a)**(1/b)) * k**(γ/b-1)
+    # return γ**γ / (a**(γ/b) * math.gamma(γ) * b) * math.exp(-γ*(k/a)**(1/b)) * k**(γ/b-1)
+    """Функция плотности с защитой от переполнения"""
+    return math.exp(km_log_pdf(k, γ, a, b))
 
 def km_log_pdf(k, γ, a, b):
-    return γ * math.log(γ) - (γ/b)*math.log(a) - math.log(math.gamma(γ)) - math.log(b) - γ*(k/a)**(1/b) + (γ/b-1)*math.log(k)
+    return γ * math.log(γ) - (γ/b)*math.log(a) - math.lgamma(γ) - math.log(b) - γ*(k/a)**(1/b) + (γ/b-1)*math.log(k)
 
 def km_cdf(k, γ, a, b):
     integral, error = quad(km_pdf, 1e-10, k, args=(γ, a, b))
@@ -461,7 +463,7 @@ if uploaded_file:
                 else:
                     data = df[values_col]
                 data = pd.DataFrame(data)
-                scaler = data.mean()
+                # scaler = data.mean()
                 n = len(data)
                 data['Ранг'] = np.arange(1, n + 1)
                 max_rank_plus_one = n + 1
@@ -568,16 +570,33 @@ if uploaded_file:
                     return CustomDistributionAdapter(fit_func, ppf_func, display_name)
 
             # Сохраняем scaler для использования в km_ppf
-            scaler_value = scaler.iloc[0] if hasattr(scaler, 'iloc') else float(scaler)
+            # scaler_value = scaler.iloc[0] if hasattr(scaler, 'iloc') else float(scaler)
+            data_min = data[values_col].min()
+            data_max = data[values_col].max()
             
             # Функция PPF для Крицкого-Менкеля (нужна для адаптера)
-            def km_ppf(x, γ, a, b):
-                """Квантильная функция распределения Крицкого-Менкеля"""
-                def equation(k):
-                    return km_cdf(k, γ, a, b) - x
-                # Ищем корень на разумном интервале
-                sol = brentq(equation, 1e-10, a * 100)
-                return sol * scaler_value  # Возвращаем в исходный масштаб
+            def km_ppf(p, γ, a, b, data_min, data_max):
+                left = data_min * 0.5
+                right = data_max * 2
+                
+                # Проверяем знаки
+                f_left = km_cdf(left, γ, a, b) - p
+                f_right = km_cdf(right, γ, a, b) - p
+                
+                # Расширяем влево
+                while f_left > 0 and left > 1e-20:
+                    left *= 0.5
+                    f_left = km_cdf(left, γ, a, b) - p
+                
+                # Расширяем вправо
+                while f_right < 0:
+                    right *= 2
+                    f_right = km_cdf(right, γ, a, b) - p
+                    if right > 1e20:
+                        raise RuntimeError("Корень не найден")
+                
+                sol = root_scalar(lambda x: km_cdf(x, γ, a, b) - p, bracket=[left, right], method='brentq')
+                return sol.root
             
             # Функции для распределения Гумбеля методом моментов
             def gumbel_moments_fit(data):
@@ -788,7 +807,7 @@ if uploaded_file:
                             # Для кастомных распределений нам нужно вычислить CDF вручную
                             if 'Крицкого-Менкеля' in distribution:
                                 # Для Крицкого-Менкеля используем нашу функцию km_cdf
-                                return km_cdf(x / scaler_value, *params)  # Нормализуем данные
+                                return km_cdf(x, *params)  # Нормализуем данные / scaler_value
                             else:
                                 # Для других кастомных распределений можно добавить аналогично
                                 return np.nan
@@ -843,7 +862,7 @@ if uploaded_file:
                 elif isinstance(selected_dist, CustomDistributionAdapter) and 'Крицкого-Менкеля' in distribution:
                     try:
                         γ, a, b = params
-                        mean = km_mean(γ, a, b) * scaler_value  # Возвращаем в исходный масштаб
+                        mean = km_mean(γ, a, b) # * scaler_value  # Возвращаем в исходный масштаб
                         cv = format_stat(km_coefficient_of_variation(γ, a, b))
                         cs = format_stat(km_coefficient_of_skewness(γ, a, b))
                     except Exception as e:
