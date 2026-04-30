@@ -21,7 +21,7 @@ from datetime import date, datetime
 from lmoments3 import distr
 from math import pi
 from scipy.integrate import quad
-from scipy.optimize import minimize, brentq
+from scipy.optimize import minimize, brentq, root_scalar
 from sklearn.metrics import mean_absolute_error, r2_score, max_error
 from sympy import EulerGamma
 
