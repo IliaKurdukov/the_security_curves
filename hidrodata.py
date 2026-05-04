@@ -452,8 +452,9 @@ if uploaded_file:
             
             null_count = df[values_col].isna().sum()
             if null_count > 0:
+                st.markdown(f"В данных обнаружены и удалены для работы пропуски в следующих строках:")
+                st.markdown(df[df[values_col].isna()].to_html(), unsafe_allow_html=True)
                 df = df.dropna(subset=[values_col])
-                st.markdown(f"В данных обнаружены пропуски. Для дальнейшей работы удалено {null_count} {pluralize_rows(null_count)}.")
                 
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
