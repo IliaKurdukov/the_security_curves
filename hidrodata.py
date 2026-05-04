@@ -449,6 +449,12 @@ if uploaded_file:
         else:
             values_col = st.selectbox("Выберите столбец с данными для построения кривой обеспеченности", numeric_cols)
             df.rename(columns={values_col: str(values_col)}, inplace=True)
+            
+            null_count = df[values_col].isna().sum()
+            if null_count > 0:
+                df = df.dropna(subset=[values_col])
+                st.markdown(f"В данных обнаружены пропуски. Для дальнейшей работы удалено {null_count} {pluralize_rows(null_count)}.")
+                
             cols.insert(0, 'Без группировки')
             index_col = st.selectbox("Выберите столбец для группировки данных", cols)
             if index_col != 'Без группировки':
