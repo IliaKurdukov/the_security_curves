@@ -1,5 +1,6 @@
 """Точка входа Streamlit: UI кривых обеспеченности."""
 
+import importlib
 import math
 from io import BytesIO
 from pathlib import Path
@@ -11,6 +12,11 @@ import plotly.graph_objects as go
 import scipy.stats as stats
 import streamlit as st
 from sklearn.metrics import mean_absolute_error, max_error, r2_score
+
+import i18n as i18n_mod
+
+# Streamlit на Windows часто не перечитывает соседние модули — форсируем словарь UI
+i18n_mod = importlib.reload(i18n_mod)
 
 from analytics import log_analytics, update_analytics_file_rows
 from distributions import (
@@ -26,14 +32,13 @@ from distributions import (
     km_coefficient_of_variation,
 )
 from excel_io import read_excel
-from i18n import (
-    AGG_KEYS,
-    dist_label,
-    init_language_widgets,
-    pluralize_rows,
-    t,
-)
 from report_io import build_results_docx
+
+AGG_KEYS = i18n_mod.AGG_KEYS
+dist_label = i18n_mod.dist_label
+init_language_widgets = i18n_mod.init_language_widgets
+pluralize_rows = i18n_mod.pluralize_rows
+t = i18n_mod.t
 
 SAMPLE_DATA_PATH = (
     Path(__file__).resolve().parent / "examples" / "tsc_sample__daily_precip.xlsx"
@@ -101,13 +106,71 @@ def localize_metric_value(val):
     return val
 
 
+def series_row_labels(series_df, values_col, index_col, precision):
+    """Подписи строк как в фильтре исключения: label → позиция."""
+    labels = []
+    label_to_pos = {}
+    for pos in range(len(series_df)):
+        val_txt = custom_round(
+            series_df.iloc[pos][values_col], min_decimals=precision
+        )
+        if index_col != NO_GROUP:
+            lab = f"{series_df.iloc[pos][index_col]} - {val_txt}"
+        else:
+            lab = str(val_txt)
+        base = lab
+        suffix = 2
+        while lab in label_to_pos:
+            lab = f"{base} ({suffix})"
+            suffix += 1
+        label_to_pos[lab] = pos
+        labels.append(lab)
+    return labels, label_to_pos
+
+
+def criterion_for_series(series_df, source_df, values_col, index_col, criterion_col, agg_key):
+    """Значения столбца-критерия, выровненные по строкам series_df."""
+    if criterion_col is None or criterion_col not in source_df.columns:
+        return None
+    if index_col == NO_GROUP:
+        if len(source_df) != len(series_df):
+            return None
+        return source_df[criterion_col].to_numpy()
+    if agg_key in ("agg_max", "agg_min"):
+        idx_fn = "idxmax" if agg_key == "agg_max" else "idxmin"
+        row_idx = getattr(source_df.groupby(index_col)[values_col], idx_fn)()
+        mapped = (
+            source_df.loc[row_idx]
+            .set_index(index_col)[criterion_col]
+        )
+    else:
+        mapped = source_df.groupby(index_col)[criterion_col].first()
+    return series_df[index_col].map(mapped).to_numpy()
+
+
 def localize_parameters_view(parameters_df_view):
     """Подписи метрик/распределений для UI и Word."""
+    from i18n import TRANSLATIONS, get_lang
+
     out = parameters_df_view.copy()
-    out.index = [
-        t("empirical") if idx == "Эмпирическое" else dist_label(str(idx))
-        for idx in out.index
-    ]
+    lang = get_lang()
+
+    def _row_label(idx):
+        if idx == "Эмпирическое":
+            return t("empirical")
+        if idx in (
+            t("compound_label"),
+            "Составная",
+            "Составное",
+            "Compound",
+        ):
+            return t("compound_label")
+        key = f"dist.{idx}"
+        if key in TRANSLATIONS.get(lang, {}) or key in TRANSLATIONS["ru"]:
+            return dist_label(str(idx))
+        return str(idx)
+
+    out.index = [_row_label(idx) for idx in out.index]
     rename_cols = {"Среднее": t("mean")}
     out = out.rename(columns=rename_cols)
     out.columns.name = t("distribution")
@@ -118,11 +181,27 @@ def localize_parameters_view(parameters_df_view):
 
 def localize_quantiles_view(quantiles_df_view):
     """Подписи строк таблицы обеспеченностей."""
+    from i18n import TRANSLATIONS, get_lang
+
     out = quantiles_df_view.copy()
-    out.index = [
-        t("ensurance") if idx == "Обеспеченность" else dist_label(str(idx))
-        for idx in out.index
-    ]
+    lang = get_lang()
+
+    def _row_label(idx):
+        if idx == "Обеспеченность":
+            return t("ensurance")
+        if idx in (
+            t("compound_label"),
+            "Составная",
+            "Составное",
+            "Compound",
+        ):
+            return t("compound_label")
+        key = f"dist.{idx}"
+        if key in TRANSLATIONS.get(lang, {}) or key in TRANSLATIONS["ru"]:
+            return dist_label(str(idx))
+        return str(idx)
+
+    out.index = [_row_label(idx) for idx in out.index]
     return out
 
 
@@ -370,6 +449,7 @@ series_df = None
 data_empirical = None
 values_col = None
 index_col = None
+agg_key = None
 precision = 1
 results_curve_png = None
 results_parameters_df = None
@@ -594,335 +674,762 @@ with tab_process:
         st.info(t("process_need_prep"))
     else:
         try:
-            data = data_empirical.sort_values(by=values_col)
-
-            data_min = data[values_col].min()
-            data_max = data[values_col].max()
-            distributions = build_distributions(data_min, data_max)
-
-            import html as _html
-
-            tip = _html.escape(t("dist_tooltip")).replace("\n", "&#10;")
-            st.markdown(
-                f'{t("select_dist")} '
-                f'<span title="{tip}" style="cursor:help;color:#666;">ⓘ</span>',
-                unsafe_allow_html=True,
-            )
-            distributions_to_plot = st.multiselect(
-                t("select_dist"),
-                list(distributions.keys()),
-                default=[list(distributions)[-1]],
-                format_func=dist_label,
-                label_visibility="collapsed",
-            )
-            if distributions_to_plot:
-                log_analytics(
-                    uploaded_file=active_file,
-                    distributions_selected=distributions_to_plot,
-                )
-
-            def scalefunc(x):
-                return stats.norm.ppf(x / 100, loc=0, scale=1)
-
-            fig, ax = plt.subplots(figsize=(12, 6))
-
-            x = data["Вероятность"] * 100
-            y = data[values_col + " (P)"]
-            plt.scatter(
-                x,
-                y,
-                label=t("empirical"),
-                s=36,
-                facecolors="none",
-                edgecolors="black",
-                linewidths=1.2,
+            from curve_analysis import (
+                PERCENT_LIST_DEFAULT,
+                apply_exceedance_axes,
+                build_empirical,
+                compound_ppf,
+                distribution_moments,
+                empirical_column_metrics,
+                fig_to_png_bytes,
+                fit_quality,
+                make_cdf_func,
+                teor_x_grid,
             )
 
-            percent_list_1 = [
-                0.01,
-                0.1,
-                0.33,
-                0.5,
-                1,
-                2,
-                3,
-                5,
-                10,
-                50,
-                63,
-                90,
-                95,
-                98,
-                99,
-                99.9,
-            ]
-            file_key = getattr(active_file, "name", None)
-            if st.session_state.get("_ensurance_file_key") != file_key:
-                st.session_state.added_ensurance_values = []
-                st.session_state["_ensurance_file_key"] = file_key
-            added_p = list(st.session_state.get("added_ensurance_values", []))
-            all_percents = sorted(set(percent_list_1) | set(added_p))
-            df_1 = pd.DataFrame(all_percents, columns=["Обеспеченность"])
+            if "curve_mode" not in st.session_state:
+                st.session_state.curve_mode = "simple"
 
-            parameters = ["Среднее", "Cv", "Cs", "R²", "MAE", "maxE", "A-D"]
-            parameters_df = pd.DataFrame(parameters, columns=["Распределение"])
-            mean = data[values_col].mean()
-            std = data[values_col].std()
-            cv = std / mean
-            cs = stats.skew(data[values_col])
-            parameters_df["Эмпирическое"] = pd.DataFrame(
-                [mean, cv, cs, "-", "-", "-", "-"]
-            )
+            def _set_curve_mode(mode: str):
+                st.session_state.curve_mode = mode
 
-            distribution_params = {}
-            distribution_objects = {}
-
-            range1 = np.arange(0.1, 1.1, 0.2)
-            range2 = np.arange(1.1, 2.0, 0.3)
-            range3 = np.arange(2.0, 98.0, 1.0)
-            range4 = np.arange(98.0, 98.9, 0.3)
-            range5 = np.arange(98.9, 99.9, 0.2)
-            x_teor = np.concatenate(
-                [range1, range2, range3, range4, range5, [99.9]]
-            )
-
-            for distribution in distributions_to_plot:
-                selected_dist = distributions[distribution]
-                params = selected_dist.fit(data[values_col])
-                distribution_params[distribution] = params
-
-                predict = data["Вероятность"].apply(
-                    lambda x, dist=selected_dist, p=params: dist.ppf(1 - x, *p)
-                )
-                r2 = r2_score(data[values_col + " (P)"], predict)
-                mae = mean_absolute_error(data[values_col + " (P)"], predict)
-                maxE = max_error(data[values_col + " (P)"], predict)
-
-                try:
-                    if isinstance(selected_dist, ScipyDistributionAdapter):
-                        fitted_dist = selected_dist._dist(*params)
-                        distribution_objects[distribution] = fitted_dist
-                        cdf_func = fitted_dist.cdf
-                    elif isinstance(selected_dist, LMomentsDistributionAdapter):
-                        fitted_dist = create_scipy_dist_from_lmoments(
-                            selected_dist._lmoments_name, params
-                        )
-                        distribution_objects[distribution] = fitted_dist
-                        cdf_func = fitted_dist.cdf
-                    elif (
-                        isinstance(selected_dist, CustomDistributionAdapter)
-                        and "Гумбеля (Мом)" in distribution
-                    ):
-                        fitted_dist = stats.gumbel_r(
-                            loc=params[0], scale=params[1]
-                        )
-                        distribution_objects[distribution] = fitted_dist
-                        cdf_func = fitted_dist.cdf
-                    elif isinstance(selected_dist, KrytskyMenkelAdapter):
-                        cdf_func = (
-                            lambda x, dist=selected_dist, p=params: dist.cdf_original(
-                                x, *p
-                            )
-                        )
-                    elif isinstance(selected_dist, CustomDistributionAdapter):
-
-                        def cdf_func(x, dist_name=distribution, p=params):
-                            return np.nan
-
-                    ad_stat = anderson_darling_test(
-                        data[values_col].values, cdf_func
-                    )
-
-                except Exception as e:
-                    st.warning(
-                        t("ad_fail", name=dist_label(distribution), error=str(e))
-                    )
-                    ad_stat = np.nan
-
-                def f(x, dist=selected_dist, p=params):
-                    return dist.ppf(1 - x / 100, *p)
-
-                f2 = np.vectorize(f)
-                teor_label = distribution
-                plt.plot(x_teor, f2(x_teor), label=dist_label(teor_label), linewidth=1.8)
-
-                df_1[f"{teor_label}"] = df_1["Обеспеченность"].apply(
-                    lambda x, dist=selected_dist, p=params: custom_round(
-                        dist.ppf(1 - x / 100, *p), min_decimals=precision
-                    )
-                )
-
-                if isinstance(selected_dist, ScipyDistributionAdapter):
-                    if distribution in distribution_objects:
-                        dist = distribution_objects[distribution]
-                    else:
-                        dist = selected_dist._dist(*params)
-                    mean = dist.mean()
-                    std = dist.std()
-                    cv = format_stat(std / mean)
-                    cs = format_stat(dist.stats(moments="s"))
-                elif isinstance(selected_dist, LMomentsDistributionAdapter):
-                    try:
-                        if distribution in distribution_objects:
-                            dist = distribution_objects[distribution]
-                        else:
-                            dist = create_scipy_dist_from_lmoments(
-                                selected_dist._lmoments_name, params
-                            )
-
-                        mean = dist.mean()
-                        std = dist.std()
-                        cv = format_stat(std / mean)
-                        cs = format_stat(dist.stats(moments="s"))
-                    except Exception as e:
-                        st.warning(
-                            t("stats_fail", name=dist_label(distribution), error=str(e))
-                        )
-                        mean = t("error_label")
-                        cv = t("error_label")
-                        cs = t("error_label")
-                elif isinstance(selected_dist, KrytskyMenkelAdapter):
-                    try:
-                        γ, a, b = params
-                        mean = selected_dist.mean_original(γ, a, b)
-                        cv = format_stat(km_coefficient_of_variation(γ, a, b))
-                        cs = format_stat(km_coefficient_of_skewness(γ, a, b))
-                    except Exception as e:
-                        st.warning(
-                            t("stats_fail", name=dist_label(distribution), error=str(e))
-                        )
-                        mean = t("error_label")
-                        cv = t("error_label")
-                        cs = t("error_label")
-                elif (
-                    isinstance(selected_dist, CustomDistributionAdapter)
-                    and "Гумбеля (Мом)" in distribution
-                ):
-                    try:
-                        dist = stats.gumbel_r(loc=params[0], scale=params[1])
-                        mean = dist.mean()
-                        std = dist.std()
-                        cv = format_stat(std / mean)
-                        cs = format_stat(dist.stats(moments="s"))
-                    except Exception as e:
-                        st.warning(
-                            t("stats_fail", name=dist_label(distribution), error=str(e))
-                        )
-                        mean = t("error_label")
-                        cv = t("error_label")
-                        cs = t("error_label")
-
-                parameters_df[f"{teor_label}"] = pd.DataFrame(
-                    [mean, cv, cs, r2, mae, maxE, ad_stat]
-                )
-
-            ax.xaxis.grid(True)
-            plt.xscale("function", functions=[scalefunc, lambda x: x])
-            ax.set_xlabel(t("ensurance_pct"), fontsize=12)
-            ax.set_ylabel(values_col, fontsize=12)
-            ax.set_title(t("curve_title"), fontsize=14)
-            ax.set(xlim=(0.1, 99.9))
-            plt.xticks(
-                [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
-            )
-            ax.set_xticklabels(
-                [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
-            )
-            ax.tick_params(axis="x", labelsize=11)
-            ax.tick_params(axis="y", labelsize=11)
-            ax.legend(title=t("legend_dist"), fontsize=11, title_fontsize=12)
-            st.pyplot(fig, width="content")
-
-            curve_buf = BytesIO()
-            fig.savefig(curve_buf, format="png", dpi=150, bbox_inches="tight")
-            plt.close(fig)
-            curve_buf.seek(0)
-            results_curve_png = curve_buf.getvalue()
-
-            parameters_df_view = parameters_df.set_index(
-                "Распределение", drop=True
-            ).T
-            parameters_df_view.columns.name = "Распределение"
-            quantiles_df_view = localize_quantiles_view(df_1.T.copy())
-
-            parameters_df_view = localize_parameters_view(parameters_df_view)
-
-            with st.expander(t("metrics_expander"), expanded=False):
-                st.markdown(
-                    style_dataframe_html(
-                        parameters_df_view, data_precision=precision
+            st.markdown(f"**{t('curve_mode')}**")
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.button(
+                    t("curve_mode_simple"),
+                    key="curve_mode_btn_simple",
+                    use_container_width=True,
+                    type=(
+                        "primary"
+                        if st.session_state.curve_mode == "simple"
+                        else "secondary"
                     ),
-                    unsafe_allow_html=True,
+                    on_click=_set_curve_mode,
+                    args=("simple",),
                 )
-                if len(parameters_df_view) >= 2:
-                    st.markdown(t("metrics_note"), unsafe_allow_html=True)
-                st.markdown(t("metrics_legend"), unsafe_allow_html=True)
+            with col_m2:
+                st.button(
+                    t("curve_mode_truncated"),
+                    key="curve_mode_btn_truncated",
+                    use_container_width=True,
+                    type=(
+                        "primary"
+                        if st.session_state.curve_mode == "truncated"
+                        else "secondary"
+                    ),
+                    on_click=_set_curve_mode,
+                    args=("truncated",),
+                )
+            with col_m3:
+                st.button(
+                    t("curve_mode_compound"),
+                    key="curve_mode_btn_compound",
+                    use_container_width=True,
+                    type=(
+                        "primary"
+                        if st.session_state.curve_mode == "compound"
+                        else "secondary"
+                    ),
+                    on_click=_set_curve_mode,
+                    args=("compound",),
+                )
+            curve_mode = st.session_state.curve_mode
 
-            with st.expander(t("quantiles_expander"), expanded=False):
+            work_series = series_df.reset_index(drop=True).copy()
+            row_labels, row_label_to_pos = series_row_labels(
+                work_series, values_col, index_col, precision
+            )
+
+            # --- truncation: reduce work_series, then ordinary analysis ---
+            if curve_mode == "truncated":
+                trunc_label_to_key = {
+                    t("trunc_by_rows"): "by_rows",
+                    t("trunc_by_threshold"): "by_threshold",
+                }
+                if st.session_state.get("ui_trunc_method") not in trunc_label_to_key:
+                    st.session_state.pop("ui_trunc_method", None)
+                trunc_choice = st.radio(
+                    t("trunc_method"),
+                    list(trunc_label_to_key.keys()),
+                    key="ui_trunc_method",
+                )
+                trunc_method = trunc_label_to_key.get(trunc_choice, "by_rows")
+                n_all = len(work_series)
+                if trunc_method == "by_rows":
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.caption(t("trunc_row_first"))
+                        first_lab = st.selectbox(
+                            t("trunc_row_first"),
+                            row_labels,
+                            index=0,
+                            key="ui_trunc_row_first",
+                            label_visibility="collapsed",
+                        )
+                    with col_b:
+                        st.caption(t("trunc_row_last"))
+                        last_lab = st.selectbox(
+                            t("trunc_row_last"),
+                            row_labels,
+                            index=max(n_all - 1, 0),
+                            key="ui_trunc_row_last",
+                            label_visibility="collapsed",
+                        )
+                    i0 = row_label_to_pos[first_lab]
+                    i1 = row_label_to_pos[last_lab]
+                    if i0 > i1:
+                        st.error(t("trunc_range_invalid"))
+                        st.stop()
+                    work_series = work_series.iloc[i0 : i1 + 1].reset_index(drop=True)
+                else:
+                    vmin = float(work_series[values_col].min())
+                    vmax = float(work_series[values_col].max())
+                    col_lo, col_hi = st.columns(2)
+                    with col_lo:
+                        st.caption(t("trunc_threshold_lo"))
+                        thr_lo = st.number_input(
+                            t("trunc_threshold_lo"),
+                            value=vmin,
+                            key="ui_trunc_thr_lo",
+                            label_visibility="collapsed",
+                        )
+                    with col_hi:
+                        st.caption(t("trunc_threshold_hi"))
+                        thr_hi = st.number_input(
+                            t("trunc_threshold_hi"),
+                            value=vmax,
+                            key="ui_trunc_thr_hi",
+                            label_visibility="collapsed",
+                        )
+                    lo, hi = min(thr_lo, thr_hi), max(thr_lo, thr_hi)
+                    work_series = work_series[
+                        (work_series[values_col] >= lo)
+                        & (work_series[values_col] <= hi)
+                    ].reset_index(drop=True)
+                if len(work_series) < 3:
+                    st.error(t("too_few_points"))
+                    st.stop()
+                data_empirical = build_empirical(work_series, values_col, index_col)
+                series_df = work_series
+
+            # --- compound: split into two segments ---
+            segments = None
+            if curve_mode == "compound":
+                split_label_to_key = {
+                    t("split_from_row"): "from_row",
+                    t("split_by_column"): "by_column",
+                    t("split_by_threshold"): "by_threshold",
+                    t("split_manual"): "manual",
+                }
+                if st.session_state.get("ui_split_method") not in split_label_to_key:
+                    st.session_state.pop("ui_split_method", None)
+                split_choice = st.radio(
+                    t("split_method"),
+                    list(split_label_to_key.keys()),
+                    key="ui_split_method",
+                )
+                split_method = split_label_to_key.get(split_choice, "from_row")
+                n_all = len(work_series)
+                mask2 = np.zeros(n_all, dtype=bool)
+
+                if split_method == "from_row":
+                    default_i = min(max(n_all // 2, 1), n_all - 1)
+                    st.caption(t("split_row_start"))
+                    start_lab = st.selectbox(
+                        t("split_row_start"),
+                        row_labels,
+                        index=default_i,
+                        key="ui_split_row_label",
+                        label_visibility="collapsed",
+                    )
+                    start_pos = row_label_to_pos[start_lab]
+                    mask2[start_pos:] = True
+                elif split_method == "by_column":
+                    crit_candidates = [c for c in df.columns if c != values_col]
+                    if not crit_candidates:
+                        st.error(t("split_need_criterion"))
+                        st.stop()
+                    st.caption(t("split_criterion_col"))
+                    criterion_col = st.selectbox(
+                        t("split_criterion_col"),
+                        crit_candidates,
+                        key="ui_split_criterion_col",
+                        label_visibility="collapsed",
+                    )
+                    crit_vals = criterion_for_series(
+                        work_series,
+                        df,
+                        values_col,
+                        index_col,
+                        criterion_col,
+                        agg_key,
+                    )
+                    if crit_vals is None:
+                        st.error(t("split_need_criterion"))
+                        st.stop()
+                    uniq = list(pd.unique(crit_vals))
+                    uniq_display = [u for u in uniq if pd.notna(u)]
+                    default_seg2 = uniq_display[len(uniq_display) // 2 :]
+                    st.caption(t("split_criterion_seg2"))
+                    chosen = st.multiselect(
+                        t("split_criterion_seg2"),
+                        uniq_display,
+                        default=default_seg2,
+                        key="ui_split_criterion_vals",
+                        label_visibility="collapsed",
+                    )
+                    mask2 = pd.Series(crit_vals).isin(chosen).to_numpy()
+                elif split_method == "by_threshold":
+                    st.caption(t("split_value_threshold"))
+                    thr = st.number_input(
+                        t("split_value_threshold"),
+                        value=float(work_series[values_col].median()),
+                        key="ui_split_val_thr",
+                        label_visibility="collapsed",
+                    )
+                    mask2 = (work_series[values_col] >= thr).to_numpy()
+                else:
+                    st.caption(t("split_manual_seg2"))
+                    chosen = st.multiselect(
+                        t("split_manual_seg2"),
+                        row_labels,
+                        key="ui_split_manual_pts",
+                        label_visibility="collapsed",
+                    )
+                    for lab in chosen:
+                        mask2[row_label_to_pos[lab]] = True
+
+                seg1 = work_series.loc[~mask2].reset_index(drop=True)
+                seg2 = work_series.loc[mask2].reset_index(drop=True)
+
+                # preview on time chart
+                with st.expander(t("split_preview"), expanded=True):
+                    fig_p, ax_p = plt.subplots(figsize=(12, 4))
+                    x_all = (
+                        work_series[index_col]
+                        if index_col != NO_GROUP
+                        else work_series.index
+                    )
+                    ax_p.plot(
+                        x_all[~mask2],
+                        work_series.loc[~mask2, values_col],
+                        "o-",
+                        color="#1f77b4",
+                        label=t("segment_title", i=1, n=len(seg1)),
+                    )
+                    ax_p.plot(
+                        x_all[mask2],
+                        work_series.loc[mask2, values_col],
+                        "o-",
+                        color="#ff7f0e",
+                        label=t("segment_title", i=2, n=len(seg2)),
+                    )
+                    ax_p.set_ylabel(values_col)
+                    ax_p.legend()
+                    st.pyplot(fig_p, width="content")
+                    plt.close(fig_p)
+
+                if len(seg1) < 3:
+                    st.error(t("segment_too_small", i=1))
+                    st.stop()
+                if len(seg2) < 3:
+                    st.error(t("segment_too_small", i=2))
+                    st.stop()
+                segments = [seg1, seg2]
+                data_empirical = build_empirical(work_series, values_col, index_col)
+
+            # ========== ORDINARY / TRUNCATED path ==========
+            if curve_mode in ("simple", "truncated"):
+                data = data_empirical.sort_values(by=values_col)
+                data_min = data[values_col].min()
+                data_max = data[values_col].max()
+                distributions = build_distributions(data_min, data_max)
+
+                import html as _html
+
+                tip = _html.escape(t("dist_tooltip")).replace("\n", "&#10;")
                 st.markdown(
-                    quantiles_df_view.to_html(index=True, header=False),
+                    f'{t("select_dist")} '
+                    f'<span title="{tip}" style="cursor:help;color:#666;">ⓘ</span>',
                     unsafe_allow_html=True,
                 )
-
-                p = st.number_input(
-                    t("custom_p_input"),
-                    min_value=0.001,
-                    max_value=99.999,
-                    value=20.0,
-                    format="%.3f",
+                distributions_to_plot = st.multiselect(
+                    t("select_dist"),
+                    list(distributions.keys()),
+                    default=[list(distributions)[-1]],
+                    format_func=dist_label,
+                    label_visibility="collapsed",
                 )
-                if (
-                    "last_logged_p" not in st.session_state
-                    or st.session_state.last_logged_p != p
-                ):
+                if distributions_to_plot:
                     log_analytics(
                         uploaded_file=active_file,
                         distributions_selected=distributions_to_plot,
-                        custom_ensurence_value=p,
                     )
-                    st.session_state.last_logged_p = p
 
-                custom_df = None
-                if distributions_to_plot:
-                    custom_dict = {}
-                    for distribution in distributions_to_plot:
-                        selected_dist = distributions[distribution]
-                        params = distribution_params[distribution]
-                        custom_dict[dist_label(distribution)] = custom_round(
-                            selected_dist.ppf(1 - p / 100, *params),
-                            min_decimals=precision,
+                fig, ax = plt.subplots(figsize=(12, 6))
+                x = data["Вероятность"] * 100
+                y = data[values_col + " (P)"]
+                ax.scatter(
+                    x,
+                    y,
+                    label=t("empirical"),
+                    s=36,
+                    facecolors="none",
+                    edgecolors="black",
+                    linewidths=1.2,
+                )
+
+                file_key = getattr(active_file, "name", None)
+                if st.session_state.get("_ensurance_file_key") != file_key:
+                    st.session_state.added_ensurance_values = []
+                    st.session_state["_ensurance_file_key"] = file_key
+                added_p = list(st.session_state.get("added_ensurance_values", []))
+                all_percents = sorted(set(PERCENT_LIST_DEFAULT) | set(added_p))
+                df_1 = pd.DataFrame(all_percents, columns=["Обеспеченность"])
+
+                parameters = ["Среднее", "Cv", "Cs", "R²", "MAE", "maxE", "A-D"]
+                parameters_df = pd.DataFrame(parameters, columns=["Распределение"])
+                mean, cv, cs = empirical_column_metrics(data, values_col)
+                parameters_df["Эмпирическое"] = pd.DataFrame(
+                    [mean, cv, cs, "-", "-", "-", "-"]
+                )
+
+                distribution_params = {}
+                x_teor = teor_x_grid()
+
+                for distribution in distributions_to_plot:
+                    selected_dist = distributions[distribution]
+                    params = selected_dist.fit(data[values_col])
+                    distribution_params[distribution] = params
+                    r2, mae, maxE, ad_stat = fit_quality(
+                        data, values_col, selected_dist, params
+                    )
+                    mean_d, cv_d, cs_d = distribution_moments(
+                        selected_dist, params, distribution
+                    )
+                    y_teor = np.vectorize(
+                        lambda xx, dist=selected_dist, p=params: dist.ppf(
+                            1 - xx / 100, *p
                         )
-                    custom_df = pd.DataFrame.from_dict(
-                        custom_dict, orient="index", columns=["Values"]
+                    )(x_teor)
+                    ax.plot(
+                        x_teor,
+                        y_teor,
+                        label=dist_label(distribution),
+                        linewidth=1.8,
+                    )
+                    df_1[distribution] = df_1["Обеспеченность"].apply(
+                        lambda xx, dist=selected_dist, p=params: custom_round(
+                            dist.ppf(1 - xx / 100, *p), min_decimals=precision
+                        )
+                    )
+                    parameters_df[distribution] = pd.DataFrame(
+                        [mean_d, cv_d, cs_d, r2, mae, maxE, ad_stat]
                     )
 
-                col_add_tbl, col_add_btn, _ = st.columns([1.4, 1, 3.5])
-                with col_add_tbl:
-                    if custom_df is not None:
+                apply_exceedance_axes(ax, values_col)
+                ax.legend(title=t("legend_dist"), fontsize=11, title_fontsize=12)
+                st.pyplot(fig, width="content")
+                results_curve_png = fig_to_png_bytes(fig)
+
+                parameters_df_view = localize_parameters_view(
+                    parameters_df.set_index("Распределение", drop=True).T
+                )
+                quantiles_df_view = localize_quantiles_view(df_1.T.copy())
+
+                with st.expander(t("metrics_expander"), expanded=False):
+                    st.markdown(
+                        style_dataframe_html(
+                            parameters_df_view, data_precision=precision
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    if len(parameters_df_view) >= 2:
+                        st.markdown(t("metrics_note"), unsafe_allow_html=True)
+                    st.markdown(t("metrics_legend"), unsafe_allow_html=True)
+
+                with st.expander(t("quantiles_expander"), expanded=False):
+                    st.markdown(
+                        quantiles_df_view.to_html(index=True, header=False),
+                        unsafe_allow_html=True,
+                    )
+                    p = st.number_input(
+                        t("custom_p_input"),
+                        min_value=0.001,
+                        max_value=99.999,
+                        value=20.0,
+                        format="%.3f",
+                        key="custom_p_simple",
+                    )
+                    if (
+                        "last_logged_p" not in st.session_state
+                        or st.session_state.last_logged_p != p
+                    ):
+                        log_analytics(
+                            uploaded_file=active_file,
+                            distributions_selected=distributions_to_plot,
+                            custom_ensurence_value=p,
+                        )
+                        st.session_state.last_logged_p = p
+                    if distributions_to_plot:
+                        custom_dict = {
+                            dist_label(d): custom_round(
+                                distributions[d].ppf(
+                                    1 - p / 100, *distribution_params[d]
+                                ),
+                                min_decimals=precision,
+                            )
+                            for d in distributions_to_plot
+                        }
+                        custom_df = pd.DataFrame.from_dict(
+                            custom_dict, orient="index", columns=["Values"]
+                        )
+                        col_add_tbl, col_add_btn, _ = st.columns([1.4, 1, 3.5])
+                        with col_add_tbl:
+                            st.markdown(
+                                custom_df.to_html(index=True, header=False),
+                                unsafe_allow_html=True,
+                            )
+                        with col_add_btn:
+                            if st.button(
+                                t("add_to_table"),
+                                use_container_width=True,
+                                key="add_p_simple",
+                            ):
+                                if any(
+                                    abs(float(p) - float(e)) < 1e-9
+                                    for e in all_percents
+                                ):
+                                    st.info(t("p_already"))
+                                else:
+                                    st.session_state.added_ensurance_values = (
+                                        added_p + [float(p)]
+                                    )
+                                    st.rerun()
+
+                results_parameters_df = parameters_df_view
+                results_quantiles_df = quantiles_df_view
+                process_ok = True
+
+            # ========== COMPOUND path ==========
+            elif curve_mode == "compound" and segments is not None:
+                import html as _html
+
+                tip = _html.escape(t("dist_tooltip")).replace("\n", "&#10;")
+                segment_fits = []
+
+                for i, seg in enumerate(segments, start=1):
+                    st.subheader(t("segment_title", i=i, n=len(seg)))
+                    emp_i = build_empirical(seg, values_col, index_col)
+                    data_i = emp_i.sort_values(by=values_col)
+                    distributions_i = build_distributions(
+                        data_i[values_col].min(), data_i[values_col].max()
+                    )
+                    st.markdown(
+                        f'{t("select_dist_one")} '
+                        f'<span title="{tip}" style="cursor:help;color:#666;">ⓘ</span>',
+                        unsafe_allow_html=True,
+                    )
+                    dist_name = st.selectbox(
+                        t("select_dist_one"),
+                        list(distributions_i.keys()),
+                        index=len(distributions_i) - 1,
+                        format_func=dist_label,
+                        key=f"seg_dist_{i}",
+                        label_visibility="collapsed",
+                    )
+                    if not dist_name:
+                        st.warning(t("need_one_dist"))
+                        st.stop()
+                    selected_dist = distributions_i[dist_name]
+                    params = selected_dist.fit(data_i[values_col])
+                    log_analytics(
+                        uploaded_file=active_file,
+                        distributions_selected=[dist_name],
+                    )
+
+                    fig_i, ax_i = plt.subplots(figsize=(12, 6))
+                    ax_i.scatter(
+                        data_i["Вероятность"] * 100,
+                        data_i[values_col + " (P)"],
+                        label=t("empirical"),
+                        s=36,
+                        facecolors="none",
+                        edgecolors="black",
+                        linewidths=1.2,
+                    )
+                    x_teor = teor_x_grid()
+                    y_teor = np.vectorize(
+                        lambda xx, dist=selected_dist, p=params: dist.ppf(
+                            1 - xx / 100, *p
+                        )
+                    )(x_teor)
+                    ax_i.plot(
+                        x_teor,
+                        y_teor,
+                        label=dist_label(dist_name),
+                        linewidth=1.8,
+                    )
+                    apply_exceedance_axes(ax_i, values_col)
+                    ax_i.legend(title=t("legend_dist"), fontsize=11, title_fontsize=12)
+                    st.pyplot(fig_i, width="content")
+                    plt.close(fig_i)
+
+                    r2, mae, maxE, ad_stat = fit_quality(
+                        data_i, values_col, selected_dist, params
+                    )
+                    mean_d, cv_d, cs_d = distribution_moments(
+                        selected_dist, params, dist_name
+                    )
+                    mean_e, cv_e, cs_e = empirical_column_metrics(data_i, values_col)
+                    parameters_df = pd.DataFrame(
+                        {
+                            "Распределение": [
+                                "Среднее",
+                                "Cv",
+                                "Cs",
+                                "R²",
+                                "MAE",
+                                "maxE",
+                                "A-D",
+                            ],
+                            "Эмпирическое": [
+                                mean_e,
+                                cv_e,
+                                cs_e,
+                                "-",
+                                "-",
+                                "-",
+                                "-",
+                            ],
+                            dist_name: [
+                                mean_d,
+                                cv_d,
+                                cs_d,
+                                r2,
+                                mae,
+                                maxE,
+                                ad_stat,
+                            ],
+                        }
+                    )
+                    parameters_df_view = localize_parameters_view(
+                        parameters_df.set_index("Распределение", drop=True).T
+                    )
+                    with st.expander(t("metrics_expander"), expanded=False):
+                        st.markdown(
+                            style_dataframe_html(
+                                parameters_df_view, data_precision=precision
+                            ),
+                            unsafe_allow_html=True,
+                        )
+                        st.markdown(t("metrics_legend"), unsafe_allow_html=True)
+
+                    segment_fits.append(
+                        {
+                            "name": dist_name,
+                            "dist": selected_dist,
+                            "params": params,
+                            "n": len(seg),
+                            "cdf": make_cdf_func(selected_dist, params, dist_name),
+                            "data": data_i,
+                            "metrics_view": parameters_df_view,
+                        }
+                    )
+
+                # --- compound curve ---
+                st.subheader(t("compound_curve_title"))
+                data_full = data_empirical.sort_values(by=values_col)
+                cdf_funcs = [f["cdf"] for f in segment_fits]
+                ns = [f["n"] for f in segment_fits]
+
+                fig_c, ax_c = plt.subplots(figsize=(12, 6))
+                y_emp = data_full[values_col + " (P)"].to_numpy(dtype=float)
+                ax_c.scatter(
+                    data_full["Вероятность"] * 100,
+                    y_emp,
+                    label=t("empirical"),
+                    s=36,
+                    facecolors="none",
+                    edgecolors="black",
+                    linewidths=1.2,
+                )
+
+                # bounds for root-finding: around data, with mild tail margin
+                data_min = float(np.nanmin(y_emp))
+                data_max = float(np.nanmax(y_emp))
+                span = max(data_max - data_min, abs(data_max), abs(data_min), 1.0)
+                x_lo, x_hi = data_min - 0.5 * span, data_max + 0.5 * span
+                for f in segment_fits:
+                    try:
+                        x_hi = max(
+                            x_hi,
+                            float(f["dist"].ppf(1 - 0.1 / 100, *f["params"])),
+                        )
+                        x_lo = min(
+                            x_lo,
+                            float(f["dist"].ppf(1 - 99.9 / 100, *f["params"])),
+                        )
+                    except Exception:
+                        pass
+
+                # same probability grid as ordinary curves → no empty vertical space
+                x_teor = teor_x_grid()
+                y_teor = np.array(
+                    [
+                        compound_ppf(float(p), cdf_funcs, ns, x_lo, x_hi)
+                        for p in x_teor
+                    ],
+                    dtype=float,
+                )
+                valid = np.isfinite(y_teor)
+                ax_c.plot(
+                    x_teor[valid],
+                    y_teor[valid],
+                    linewidth=1.8,
+                    label=t("compound_label"),
+                )
+                apply_exceedance_axes(ax_c, values_col, title=t("compound_curve_title"))
+                ys = np.concatenate([y_emp[np.isfinite(y_emp)], y_teor[valid]])
+                if len(ys):
+                    y0, y1 = float(np.min(ys)), float(np.max(ys))
+                    pad = 0.05 * max(y1 - y0, 1e-9)
+                    ax_c.set_ylim(y0 - pad, y1 + pad)
+                ax_c.legend(title=t("legend_dist"), fontsize=11, title_fontsize=12)
+                st.pyplot(fig_c, width="content")
+                results_curve_png = fig_to_png_bytes(fig_c)
+
+                # compound metrics vs empirical full series
+                predict_c = []
+                for _, row in data_full.iterrows():
+                    p_emp = float(row["Вероятность"] * 100)
+                    predict_c.append(
+                        compound_ppf(p_emp, cdf_funcs, ns, x_lo, x_hi)
+                    )
+                predict_c = np.asarray(predict_c, dtype=float)
+                y_emp = data_full[values_col + " (P)"].to_numpy(dtype=float)
+                valid = np.isfinite(predict_c)
+                if valid.sum() >= 3:
+                    r2 = r2_score(y_emp[valid], predict_c[valid])
+                    mae = mean_absolute_error(y_emp[valid], predict_c[valid])
+                    maxE = max_error(y_emp[valid], predict_c[valid])
+                else:
+                    r2 = mae = maxE = np.nan
+                mean_e, cv_e, cs_e = empirical_column_metrics(data_full, values_col)
+                # moments for compound: weighted means of component moments
+                means = []
+                for f in segment_fits:
+                    m, _, _ = distribution_moments(f["dist"], f["params"], f["name"])
+                    means.append(m if not isinstance(m, str) else np.nan)
+                try:
+                    mean_c = float(np.nansum([m * n for m, n in zip(means, ns)]) / sum(ns))
+                except Exception:
+                    mean_c = t("error_label")
+                parameters_df = pd.DataFrame(
+                    {
+                        "Распределение": [
+                            "Среднее",
+                            "Cv",
+                            "Cs",
+                            "R²",
+                            "MAE",
+                            "maxE",
+                            "A-D",
+                        ],
+                        "Эмпирическое": [mean_e, cv_e, cs_e, "-", "-", "-", "-"],
+                        t("compound_label"): [
+                            mean_c,
+                            "-",
+                            "-",
+                            r2,
+                            mae,
+                            maxE,
+                            "-",
+                        ],
+                    }
+                )
+                parameters_df_view = localize_parameters_view(
+                    parameters_df.set_index("Распределение", drop=True).T
+                )
+                with st.expander(t("compound_metrics"), expanded=False):
+                    st.markdown(
+                        style_dataframe_html(
+                            parameters_df_view, data_precision=precision
+                        ),
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(t("metrics_legend"), unsafe_allow_html=True)
+
+                file_key = getattr(active_file, "name", None)
+                if st.session_state.get("_ensurance_file_key") != file_key:
+                    st.session_state.added_ensurance_values = []
+                    st.session_state["_ensurance_file_key"] = file_key
+                added_p = list(st.session_state.get("added_ensurance_values", []))
+                all_percents = sorted(set(PERCENT_LIST_DEFAULT) | set(added_p))
+                rows = {"Обеспеченность": all_percents}
+                compound_vals = []
+                for pp in all_percents:
+                    q = compound_ppf(pp, cdf_funcs, ns, x_lo, x_hi)
+                    compound_vals.append(
+                        custom_round(q, min_decimals=precision)
+                        if np.isfinite(q)
+                        else "—"
+                    )
+                rows[t("compound_label")] = compound_vals
+                df_1 = pd.DataFrame(rows)
+                quantiles_df_view = localize_quantiles_view(df_1.T.copy())
+
+                with st.expander(t("quantiles_expander"), expanded=False):
+                    st.markdown(
+                        quantiles_df_view.to_html(index=True, header=False),
+                        unsafe_allow_html=True,
+                    )
+                    p = st.number_input(
+                        t("custom_p_input"),
+                        min_value=0.001,
+                        max_value=99.999,
+                        value=20.0,
+                        format="%.3f",
+                        key="custom_p_compound",
+                    )
+                    val = compound_ppf(p, cdf_funcs, ns, x_lo, x_hi)
+                    custom_df = pd.DataFrame(
+                        {
+                            "Values": [
+                                custom_round(val, min_decimals=precision)
+                                if np.isfinite(val)
+                                else "—"
+                            ]
+                        },
+                        index=[t("compound_label")],
+                    )
+                    col_add_tbl, col_add_btn, _ = st.columns([1.4, 1, 3.5])
+                    with col_add_tbl:
                         st.markdown(
                             custom_df.to_html(index=True, header=False),
                             unsafe_allow_html=True,
                         )
-                with col_add_btn:
-                    if st.button(
-                        t("add_to_table"),
-                        use_container_width=True,
-                    ):
-                        if not distributions_to_plot:
-                            st.warning(t("need_dist"))
-                        elif any(
-                            abs(float(p) - float(e)) < 1e-9 for e in all_percents
+                    with col_add_btn:
+                        if st.button(
+                            t("add_to_table"),
+                            use_container_width=True,
+                            key="add_p_compound",
                         ):
-                            st.info(t("p_already"))
-                        else:
-                            st.session_state.added_ensurance_values = added_p + [
-                                float(p)
-                            ]
-                            st.rerun()
+                            if any(
+                                abs(float(p) - float(e)) < 1e-9 for e in all_percents
+                            ):
+                                st.info(t("p_already"))
+                            else:
+                                st.session_state.added_ensurance_values = added_p + [
+                                    float(p)
+                                ]
+                                st.rerun()
 
-            results_parameters_df = parameters_df_view
-            results_quantiles_df = quantiles_df_view
-            process_ok = True
+                results_parameters_df = parameters_df_view
+                results_quantiles_df = quantiles_df_view
+                process_ok = True
+
         except Exception as e:
             st.error(t("error_prefix", error=str(e)))
 
