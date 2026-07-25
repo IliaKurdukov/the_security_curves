@@ -34,6 +34,121 @@ GRAPHS_DIR = Path("graphs")
 
 # Должно совпадать с SAMPLE_FILE_NAMES в analytics.py
 SAMPLE_FILE_NAMES = ["tsc_sample__daily_precip.xlsx"]
+# Старое имя примера и файлы, полностью исключаемые из облака
+EXCLUDED_WORDCLOUD_FILES = {
+    "тест.xlsx",
+    "суточные осадки.xlsx",
+    "tsc_sample__daily_precip.xlsx",
+}
+
+# Целые имена-заглушки Excel / мусор (без расширения, lower)
+JUNK_FILENAME_STEMS = {
+    "книга1",
+    "книга2",
+    "книга3",
+    "книга4",
+    "книга5",
+    "book1",
+    "book2",
+    "sheet1",
+    "лист microsoft excel",
+    "обработанный",
+    "обработанные",
+    "ряд",
+    "данные",
+    "файл",
+    "new",
+    "новый",
+    "таблица",
+    "без имени",
+    "untitled",
+}
+
+# Токены, которые не несут смысла в названиях
+JUNK_TOKENS = {
+    "книга",
+    "book",
+    "sheet",
+    "лист",
+    "microsoft",
+    "excel",
+    "xlsx",
+    "xls",
+    "xlsm",
+    "копия",
+    "copy",
+    "вариант",
+    "версия",
+    "temp",
+    "tmp",
+    "тест",
+    "test",
+    "sample",
+    "пример",
+    "для",
+    "в",
+    "и",
+    "по",
+    "на",
+    "с",
+    "из",
+    "к",
+    "от",
+    "до",
+    "без",
+    "или",
+    "the",
+    "of",
+    "and",
+    "to",
+    "a",
+    "продолжение",
+    "программа",
+    "программу",
+    "расчет",
+    "расчёт",
+    "расчеты",
+    "расчёты",
+    "расчётов",
+    "расчетов",
+    "данные",
+    "файл",
+    "таблица",
+    "новый",
+    "new",
+    "обработанный",
+    "обработанные",
+    "ряд",
+    "г",
+    "р",
+    "с",
+    "пгт",
+    "пос",
+    "дер",
+    "справка",
+    "сводная",
+    "даты",
+    "дата",
+    "характеристики",
+    "характеристика",
+    "малый",
+    "большой",
+    "koordinat",
+    "координат",
+    "координаты",
+    "gidroposty",
+    "os",
+    "bez",
+    "бд",
+    "era",
+    "epa",
+    "ланд",
+    "количество",
+    "пос1",
+}
+
+# Matplotlib C0 + оттенки Blues (тёмная половина, чтобы читалось на белом)
+_BLUE_CMAP = plt.colormaps.get_cmap("Blues") if hasattr(plt, "colormaps") else plt.cm.get_cmap("Blues")
 
 
 def is_sample_file(filename):
@@ -42,6 +157,187 @@ def is_sample_file(filename):
         return False
     name = Path(str(filename)).name.lower()
     return any(item.lower() == name for item in SAMPLE_FILE_NAMES)
+
+
+def _cyrillic_font_path():
+    """Шрифт с кириллицей: DejaVu из matplotlib или системный."""
+    import matplotlib as mpl
+
+    candidates = [
+        Path(mpl.get_data_path()) / "fonts" / "ttf" / "DejaVuSans.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("C:/Windows/Fonts/arial.ttf"),
+        Path("C:/Windows/Fonts/segoeui.ttf"),
+    ]
+    for path in candidates:
+        if path.is_file():
+            return str(path)
+    return None
+
+
+def _is_keyboard_mash(token):
+    """ааааа / вввввв / asdf-подобное."""
+    if len(token) < 3:
+        return False
+    if len(set(token)) == 1:
+        return True
+    # почти все символы одинаковые
+    most = Counter(token).most_common(1)[0][1]
+    return most / len(token) >= 0.75
+
+
+def _is_junk_filename_stem(stem):
+    s = stem.strip().lower()
+    s = re.sub(r"\s*\(\d+\)\s*$", "", s).strip()
+    if not s:
+        return True
+    if s in JUNK_FILENAME_STEMS:
+        return True
+    if re.fullmatch(r"книга\s*\d+(\s+\d+)*", s) or re.fullmatch(r"book\s*\d+", s):
+        return True
+    if s.startswith("лист microsoft excel"):
+        return True
+    if re.fullmatch(r"[\d\s._-]+", s):
+        return True
+    if _is_keyboard_mash(re.sub(r"[\s._-]+", "", s)):
+        return True
+    return False
+
+
+def _is_junk_token(token):
+    t = token.strip().lower()
+    if len(t) < 2:
+        return True
+    if t in JUNK_TOKENS:
+        return True
+    if re.fullmatch(r"книга\d*", t) or re.fullmatch(r"book\d*", t):
+        return True
+    if re.fullmatch(r"\d+", t):
+        return True
+    if re.fullmatch(r"\d{4}", t):  # год
+        return True
+    if re.fullmatch(r"\d{4}\s*[-–—]\s*\d{4}", t):
+        return True
+    # коды вроде 11БД, 4сут
+    if re.fullmatch(r"\d+[a-zа-яё]+", t, flags=re.IGNORECASE):
+        return True
+    if _is_keyboard_mash(t):
+        return True
+    return False
+
+
+def extract_filename_tokens(filename):
+    """Слова из имени файла для облака (без расширения и мусора)."""
+    if filename is None or (isinstance(filename, float) and pd.isna(filename)):
+        return []
+    name = Path(str(filename)).name
+    if name.lower() in {x.lower() for x in EXCLUDED_WORDCLOUD_FILES}:
+        return []
+    if is_sample_file(name):
+        return []
+
+    stem = Path(name).stem
+    stem = re.sub(r"\s*[—–-]\s*копия\s*$", "", stem, flags=re.IGNORECASE)
+    stem = re.sub(r"\s*\(\d+\)\s*$", "", stem).strip()
+    if _is_junk_filename_stem(stem):
+        return []
+
+    # разделители → пробелы
+    text = stem.replace("_", " ").replace("-", " ").replace("—", " ").replace("–", " ")
+    text = text.replace(".", " ").replace(",", " ").replace("%", " ")
+    text = re.sub(r"[()\[\]{}«»\"']", " ", text)
+    parts = re.split(r"\s+", text)
+    tokens = []
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        # убрать ведущие нули у номеров вроде 01
+        if re.fullmatch(r"0+\d+", part):
+            continue
+        if _is_junk_token(part):
+            continue
+        tokens.append(part)
+    return tokens
+
+
+def _blue_color_func(word, font_size, position, orientation, random_state=None, **kwargs):
+    """Оттенки Blues на базе стандартной синей шкалы matplotlib."""
+    if random_state is None:
+        t = float(np.random.uniform(0.45, 0.95))
+    else:
+        t = float(random_state.uniform(0.45, 0.95))
+    r, g, b, _ = _BLUE_CMAP(t)
+    return f"rgb({int(r * 255)}, {int(g * 255)}, {int(b * 255)})"
+
+
+def create_filename_wordcloud(df):
+    """Облако слов по именам загружаемых файлов (без тестовых/мусорных)."""
+    try:
+        from wordcloud import WordCloud
+    except ImportError:
+        return False
+
+    df = df.copy()
+    df = df[~df["file_name"].apply(is_sample_file)]
+
+    token_counts = Counter()
+    for name in df["file_name"].dropna():
+        for token in extract_filename_tokens(name):
+            # единый ключ без регистра, отображение — самый частый вариант написания
+            token_counts[token] += 1
+
+    if not token_counts:
+        return False
+
+    # Схлопнуть регистровые дубликаты: Уровни / уровни
+    folded = {}
+    display = {}
+    for token, count in token_counts.items():
+        key = token.casefold()
+        folded[key] = folded.get(key, 0) + count
+        # предпочитаем вариант с заглавной, если есть
+        prev = display.get(key)
+        if prev is None or (token[:1].isupper() and not prev[:1].isupper()):
+            display[key] = token
+
+    frequencies = {display[k]: v for k, v in folded.items()}
+    if not frequencies:
+        return False
+
+    font_path = _cyrillic_font_path()
+    wc = WordCloud(
+        width=800,
+        height=400,
+        background_color="white",
+        prefer_horizontal=0.9,
+        max_words=80,
+        relative_scaling=0.45,
+        collocations=False,
+        font_path=font_path,
+        color_func=_blue_color_func,
+        min_font_size=10,
+    )
+    wc.generate_from_frequencies(frequencies)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.imshow(wc, interpolation="bilinear")
+    ax.axis("off")
+    ax.set_title(
+        'Самые частые названия файлов (кроме "Книга1" и "Лист Microsoft Excel")'
+    )
+    plt.tight_layout()
+
+    GRAPHS_DIR.mkdir(exist_ok=True)
+    plt.savefig(
+        GRAPHS_DIR / "filename_wordcloud.png",
+        dpi=100,
+        bbox_inches="tight",
+        facecolor="white",
+        edgecolor="none",
+    )
+    plt.close()
+    return True
 
 
 def get_analytics_csv():
@@ -259,6 +555,7 @@ def update_readme_with_analytics():
     # Создаем графики
     daily_created = create_daily_activity_graph(df)
     dist_created = create_distributions_graph(df)
+    cloud_created = create_filename_wordcloud(df)
     
     # Формируем секцию аналитики
     today = datetime.now().strftime("%d.%m.%Y %H:%M")
@@ -278,8 +575,14 @@ def update_readme_with_analytics():
 ![Популярные распределения](graphs/distributions.png)
 
 """
+
+    if cloud_created:
+        analytics_section += """
+![Облако названий файлов](graphs/filename_wordcloud.png)
+
+"""
     
-    if not daily_created and not dist_created:
+    if not daily_created and not dist_created and not cloud_created:
         analytics_section += "*Нет данных для отображения*\n\n"
     
     analytics_section += "<!-- END_ANALYTICS -->"

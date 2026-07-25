@@ -28,6 +28,9 @@
 
 ![Популярные распределения](graphs/distributions.png)
 
+
+![Облако названий файлов](graphs/filename_wordcloud.png)
+
 <!-- END_ANALYTICS -->
 
 🔹 **Любые вопросы и пожелания:** [Телеграм](https://t.me/ilia_kurdukov)
