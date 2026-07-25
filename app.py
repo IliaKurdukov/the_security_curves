@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import scipy.stats as stats
 import streamlit as st
 from sklearn.metrics import mean_absolute_error, max_error, r2_score
@@ -389,37 +390,111 @@ if active_file:
             )
             df.rename(columns={index_col: str(index_col)}, inplace=True)
 
+        if index_col != "Без группировки":
+            series_df = (
+                df.pivot_table(
+                    index=index_col, values=values_col, aggfunc=AGG_FUNCS[aggfunc]
+                )
+                .reset_index()
+            )
+        else:
+            series_df = pd.DataFrame(
+                {values_col: df[values_col].to_numpy(copy=True)}
+            )
+
+        # Среднее по группе даёт длинные float — точность берём из сырой колонки.
+        # Для суммы/мин/макс можно смотреть уже агрегированный ряд.
+        if aggfunc == "Средние значения":
+            precision = detect_decimal_precision(df[values_col])
+        else:
+            precision = detect_decimal_precision(series_df[values_col])
+
+        series_full = series_df.copy()
+        x_full = (
+            series_full[index_col]
+            if index_col != "Без группировки"
+            else series_full.index
+        )
+        with st.expander("📊 График хода значений", expanded=False):
+            fig_plotly = go.Figure(
+                data=[
+                    go.Scatter(
+                        x=list(x_full),
+                        y=series_full[values_col].tolist(),
+                        mode="lines+markers",
+                        marker={"size": 6},
+                        line={"width": 1},
+                        name=values_col,
+                    )
+                ]
+            )
+            fig_plotly.update_layout(
+                title="График хода значений",
+                xaxis_title=index_col if index_col != "Без группировки" else "Индекс",
+                yaxis_title=values_col,
+                height=360,
+                margin={"l": 40, "r": 20, "t": 40, "b": 40},
+            )
+            st.plotly_chart(fig_plotly, use_container_width=True)
+
+        exclude_options = []
+        exclude_key_to_pos = {}
+        for pos in range(len(series_df)):
+            val_txt = custom_round(
+                series_df.iloc[pos][values_col], min_decimals=precision
+            )
+            if index_col != "Без группировки":
+                label = f"{series_df.iloc[pos][index_col]} - {val_txt}"
+            else:
+                label = str(val_txt)
+            base = label
+            suffix = 2
+            while label in exclude_key_to_pos:
+                label = f"{base} ({suffix})"
+                suffix += 1
+            exclude_key_to_pos[label] = pos
+            exclude_options.append(label)
+
+        excluded_labels = st.multiselect(
+            "Выберите данные для исключения из дальнейшего расчета",
+            exclude_options,
+        )
+        if excluded_labels:
+            drop_positions = {exclude_key_to_pos[label] for label in excluded_labels}
+            series_df = series_df.drop(
+                index=[series_df.index[p] for p in sorted(drop_positions)]
+            ).reset_index(drop=True)
+
+        if len(series_df) < 3:
+            st.error(
+                "После исключения осталось слишком мало данных для расчета "
+                "(нужно не менее 3 значений)."
+            )
+            st.stop()
+
+        data = series_df.copy()
+        n = len(data)
+        data["Ранг"] = np.arange(1, n + 1)
+        max_rank_plus_one = n + 1
+        data["Вероятность"] = data["Ранг"] / max_rank_plus_one
+        data["Обеспеченность P, %"] = round(data["Вероятность"] * 100, 2)
+        data_to_merge = data.sort_values(by=values_col, ascending=False)
+        data_to_merge.drop(
+            ["Вероятность", "Обеспеченность P, %", "Ранг"], axis=1, inplace=True
+        )
+        data_to_merge.rename(columns={values_col: values_col + " (P)"}, inplace=True)
+        if index_col != "Без группировки":
+            data_to_merge.rename(
+                columns={index_col: index_col + " (P)"}, inplace=True
+            )
+        data_to_merge["Ранг"] = np.arange(1, n + 1)
+        data = data.merge(data_to_merge, on="Ранг")
+        data.set_index("Ранг", inplace=True)
+
         with st.expander(
             "🔢 Хронологический ряд значений и эмпирическое распределение",
             expanded=False,
         ):
-            if index_col != "Без группировки":
-                data = df.pivot_table(
-                    index=index_col, values=values_col, aggfunc=AGG_FUNCS[aggfunc]
-                )
-            else:
-                data = df[values_col]
-            data = pd.DataFrame(data)
-            n = len(data)
-            data["Ранг"] = np.arange(1, n + 1)
-            max_rank_plus_one = n + 1
-            data["Вероятность"] = data["Ранг"] / max_rank_plus_one
-            data["Обеспеченность P, %"] = round(data["Вероятность"] * 100, 2)
-            if index_col != "Без группировки":
-                data[index_col] = data.index
-            data_to_merge = data.sort_values(by=values_col, ascending=False)
-            data_to_merge.drop(
-                ["Вероятность", "Обеспеченность P, %", "Ранг"], axis=1, inplace=True
-            )
-            data_to_merge.rename(columns={values_col: values_col + " (P)"}, inplace=True)
-            if index_col != "Без группировки":
-                data_to_merge.rename(
-                    columns={index_col: index_col + " (P)"}, inplace=True
-                )
-                data_to_merge[index_col + " (P)"] = data_to_merge.index
-            data_to_merge["Ранг"] = np.arange(1, n + 1)
-            data = data.merge(data_to_merge, on="Ранг")
-            data.set_index("Ранг", inplace=True)
             if index_col != "Без группировки":
                 st.markdown(
                     data[
@@ -435,19 +510,25 @@ if active_file:
                 )
             else:
                 st.markdown(
-                    data[[values_col, "Обеспеченность P, %", values_col + " (P)"]].to_html(),
+                    data[
+                        [values_col, "Обеспеченность P, %", values_col + " (P)"]
+                    ].to_html(),
                     unsafe_allow_html=True,
                 )
 
         with st.expander("📊 График хода значений", expanded=False):
-            fig, ax = plt.subplots(figsize=(4, 2))
-            x = data[index_col] if index_col != "Без группировки" else data.index
-            y = data[values_col]
-            plt.plot(x, y, linewidth=0.5)
-            ax.set_ylabel(values_col, fontsize=5)
-            ax.set_title("График хода значений", fontsize=6)
-            ax.tick_params(axis="x", labelsize=5)
-            ax.tick_params(axis="y", labelsize=5)
+            fig, ax = plt.subplots(figsize=(12, 6))
+            x = (
+                series_df[index_col]
+                if index_col != "Без группировки"
+                else series_df.index
+            )
+            y = series_df[values_col]
+            plt.plot(x, y, linewidth=1.5)
+            ax.set_ylabel(values_col, fontsize=12)
+            ax.set_title("График хода значений", fontsize=14)
+            ax.tick_params(axis="x", labelsize=11)
+            ax.tick_params(axis="y", labelsize=11)
             st.pyplot(fig, width="content")
 
         data = data.sort_values(by=values_col)
@@ -530,7 +611,7 @@ if active_file:
         def scalefunc(x):
             return stats.norm.ppf(x / 100, loc=0, scale=1)
 
-        fig, ax = plt.subplots(figsize=(4, 2))
+        fig, ax = plt.subplots(figsize=(12, 6))
 
         x = data["Вероятность"] * 100
         y = data[values_col + " (P)"]
@@ -538,10 +619,10 @@ if active_file:
             x,
             y,
             label="Эмпирическое",
-            s=5,
+            s=36,
             facecolors="none",
             edgecolors="black",
-            linewidths=0.5,
+            linewidths=1.2,
         )
 
         percent_list_1 = [
@@ -571,13 +652,6 @@ if active_file:
         cv = std / mean
         cs = stats.skew(data[values_col])
         parameters_df["Эмпирическое"] = pd.DataFrame([mean, cv, cs, "-", "-", "-", "-"])
-
-        # Среднее по группе даёт длинные float — точность берём из сырой колонки.
-        # Для суммы/мин/макс можно смотреть уже агрегированный ряд.
-        if aggfunc == "Средние значения":
-            precision = detect_decimal_precision(df[values_col])
-        else:
-            precision = detect_decimal_precision(data[values_col])
 
         distribution_params = {}
         distribution_objects = {}
@@ -641,7 +715,7 @@ if active_file:
 
             f2 = np.vectorize(f)
             teor_label = distribution
-            plt.plot(x_teor, f2(x_teor), label=teor_label, linewidth=0.7)
+            plt.plot(x_teor, f2(x_teor), label=teor_label, linewidth=1.8)
 
             df_1[f"{teor_label}"] = df_1["Обеспеченность"].apply(
                 lambda x, dist=selected_dist, p=params: custom_round(
@@ -715,18 +789,17 @@ if active_file:
 
         ax.xaxis.grid(True)
         plt.xscale("function", functions=[scalefunc, lambda x: x])
-        ax.set_xlabel("Обеспеченность, %", fontsize=5)
-        ax.set_ylabel(values_col, fontsize=5)
-        ax.set_title("Значения с разной долей обеспеченности", fontsize=6)
+        ax.set_xlabel("Обеспеченность, %", fontsize=12)
+        ax.set_ylabel(values_col, fontsize=12)
+        ax.set_title("Значения с разной долей обеспеченности", fontsize=14)
         ax.set(xlim=(0.1, 99.9))
         plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
         ax.set_xticklabels(
             [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
         )
-        plt.legend(title="Вид распределения")
-        ax.tick_params(axis="x", labelsize=5)
-        ax.tick_params(axis="y", labelsize=5)
-        legend = ax.legend(fontsize=5)
+        ax.tick_params(axis="x", labelsize=11)
+        ax.tick_params(axis="y", labelsize=11)
+        ax.legend(title="Вид распределения", fontsize=11, title_fontsize=12)
         st.pyplot(fig, width="content")
 
         with st.expander(
