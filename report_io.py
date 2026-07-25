@@ -44,12 +44,14 @@ def _format_cell(val, min_decimals=None):
     return _custom_round(num, min_decimals=min_decimals)
 
 
-def _format_parameters_df(df, data_precision=None):
+def _format_parameters_df(df, data_precision=None, lang="ru"):
     """Округление метрик как на сайте (style_dataframe_html)."""
+    from i18n import t as _t
+
     out = df.copy()
-    out.index.name = "Распределение"
+    out.index.name = _t("distribution", lang=lang)
     out.columns.name = None
-    # Среднее (0), MAE (4), maxE (5) — в единицах исходного ряда
+    # Mean (0), MAE (4), maxE (5) — в единицах исходного ряда
     data_scale_cols = {0, 4, 5}
     for j, col in enumerate(out.columns):
         min_decimals = data_precision if j in data_scale_cols else None
@@ -65,6 +67,7 @@ def _add_dataframe_table(
     include_index=True,
     index_label=None,
     show_header=True,
+    default_index_label="Distribution",
 ):
     """Добавляет таблицу DataFrame в документ."""
     df = df.copy()
@@ -73,7 +76,7 @@ def _add_dataframe_table(
         if label is None:
             label = df.index.name if df.index.name not in (None, "") else None
         if label is None:
-            label = "Распределение"
+            label = default_index_label
         df.index.name = label
         df = df.reset_index(drop=False)
         first = df.columns[0]
@@ -100,17 +103,19 @@ def _add_dataframe_table(
             cells[i].text = "" if pd.isna(val) else str(val)
 
 
-def _make_series_chart_png(series_df, values_col, index_col):
+def _make_series_chart_png(
+    series_df, values_col, index_col, title, no_group_marker
+):
     """PNG графика хода значений (matplotlib)."""
     fig, ax = plt.subplots(figsize=(12, 6))
-    x = series_df[index_col] if index_col != "Без группировки" else series_df.index
+    x = series_df[index_col] if index_col != no_group_marker else series_df.index
     y = series_df[values_col]
     ax.plot(x, y, linewidth=1.5)
     ax.set_ylabel(values_col, fontsize=12)
-    ax.set_title("График хода значений", fontsize=14)
+    ax.set_title(title, fontsize=14)
     ax.tick_params(axis="x", labelsize=11)
     ax.tick_params(axis="y", labelsize=11)
-    if index_col != "Без группировки":
+    if index_col != no_group_marker:
         ax.set_xlabel(index_col, fontsize=12)
     fig.tight_layout()
     buf = BytesIO()
@@ -129,60 +134,72 @@ def build_results_docx(
     parameters_df=None,
     quantiles_df=None,
     data_precision=None,
+    lang="ru",
+    no_group_marker="__no_group__",
 ):
     """
     Word: эмпирический ряд, график хода, кривые, метрики, таблица обеспеченностей.
     Возвращает bytes готового .docx.
     """
+    from i18n import t as _t
+
     doc = Document()
-    title = doc.add_heading("Кривые обеспеченности — результаты", level=0)
+    title = doc.add_heading(_t("docx_title", lang=lang), level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    doc.add_heading("Эмпирический ряд", level=1)
-    if index_col != "Без группировки":
+    doc.add_heading(_t("docx_empirical", lang=lang), level=1)
+    ensurance_col = "Обеспеченность P, %"
+    if index_col != no_group_marker:
         table_df = data[
             [
                 index_col,
                 values_col,
-                "Обеспеченность P, %",
+                ensurance_col,
                 values_col + " (P)",
                 index_col + " (P)",
             ]
         ].copy()
     else:
-        table_df = data[
-            [values_col, "Обеспеченность P, %", values_col + " (P)"]
-        ].copy()
-    _add_dataframe_table(doc, table_df, include_index=True, index_label="Ранг")
+        table_df = data[[values_col, ensurance_col, values_col + " (P)"]].copy()
+    table_df = table_df.rename(
+        columns={ensurance_col: _t("ensurance_p_pct", lang=lang)}
+    )
+    _add_dataframe_table(
+        doc,
+        table_df,
+        include_index=True,
+        index_label=_t("rank", lang=lang),
+    )
 
-    doc.add_heading("График хода значений", level=1)
-    chart_png = _make_series_chart_png(series_df, values_col, index_col)
+    doc.add_heading(_t("docx_series_chart", lang=lang), level=1)
+    chart_png = _make_series_chart_png(
+        series_df,
+        values_col,
+        index_col,
+        title=_t("chart_series_title", lang=lang),
+        no_group_marker=no_group_marker,
+    )
     doc.add_picture(chart_png, width=Cm(16))
 
     if curve_png:
-        doc.add_heading("Кривые обеспеченности", level=1)
+        doc.add_heading(_t("docx_curves", lang=lang), level=1)
         doc.add_picture(BytesIO(curve_png), width=Cm(16))
 
     if parameters_df is not None and not parameters_df.empty:
-        doc.add_heading(
-            "Параметры и метрики качества полученных распределений",
-            level=1,
+        doc.add_heading(_t("docx_metrics", lang=lang), level=1)
+        params_fmt = _format_parameters_df(
+            parameters_df, data_precision=data_precision, lang=lang
         )
-        params_fmt = _format_parameters_df(parameters_df, data_precision=data_precision)
         _add_dataframe_table(
             doc,
             params_fmt,
             include_index=True,
-            index_label="Распределение",
+            index_label=_t("distribution", lang=lang),
             show_header=True,
         )
 
     if quantiles_df is not None and not quantiles_df.empty:
-        doc.add_heading(
-            "Расчет значений с разной долей обеспеченности (в %)",
-            level=1,
-        )
-        # Как на сайте: индекс слева, без строки заголовков 0,1,2...
+        doc.add_heading(_t("docx_quantiles", lang=lang), level=1)
         q = quantiles_df.copy()
         q.columns.name = None
         q.index.name = None

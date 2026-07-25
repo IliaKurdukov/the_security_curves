@@ -29,9 +29,14 @@ def anderson_darling_test(data, cdf_func):
 
 
 def format_stat(value):
-    """Форматирует статистику: заменяет nan/inf на 'Не существует'."""
+    """Форматирует статистику: заменяет nan/inf на локализованный маркер."""
     if np.isnan(value) or np.isinf(value):
-        return "Не существует"
+        try:
+            from i18n import t
+
+            return t("stat_undefined")
+        except Exception:
+            return "Не существует"
     return value
 
 
