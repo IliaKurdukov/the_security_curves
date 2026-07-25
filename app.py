@@ -1,5 +1,9 @@
 """Точка входа Streamlit: UI кривых обеспеченности."""
 
+import math
+from io import BytesIO
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -21,6 +25,39 @@ from distributions import (
     km_coefficient_of_variation,
 )
 from excel_io import read_excel
+
+SAMPLE_DATA_PATH = Path(__file__).resolve().parent / "examples" / "Суточные осадки.xlsx"
+SAMPLE_VALUES_COL = "Осадки, мм"
+SAMPLE_GROUP_COL = "Год"
+SAMPLE_AGG_FUNC = "Максимальные значения"
+
+AGG_OPTIONS = [
+    "Максимальные значения",
+    "Минимальные значения",
+    "Средние значения",
+    "Суммарные значения",
+]
+AGG_FUNCS = {
+    "Максимальные значения": "max",
+    "Минимальные значения": "min",
+    "Средние значения": "mean",
+    "Суммарные значения": "sum",
+}
+
+
+def option_index(options, preferred):
+    """Индекс preferred в options, иначе 0."""
+    opts = list(options)
+    if preferred is not None and preferred in opts:
+        return opts.index(preferred)
+    return 0
+
+
+def load_sample_file():
+    """BytesIO с .name — как у st.file_uploader, для read_excel/analytics."""
+    data = BytesIO(SAMPLE_DATA_PATH.read_bytes())
+    data.name = SAMPLE_DATA_PATH.name
+    return data
 
 ru_dict = {
     "page_title": "Кривые обеспеченности",
@@ -72,23 +109,29 @@ def pluralize_rows(number: int) -> str:
     return "строк"
 
 
-def detect_decimal_precision(series):
-    """Сколько знаков после запятой у исходных данных (минимум 1, как раньше)."""
-    max_prec = 0
-    saw_fraction = False
+def detect_decimal_precision(series, max_reasonable=6):
+    """
+    Сколько знаков после запятой у исходных данных (минимум 1).
+    Игнорирует единичные float-артефакты Excel с длинным хвостом.
+    """
+    counts = []
     for val in series.dropna():
-        if isinstance(val, (int, np.integer)):
+        try:
+            fv = float(val)
+        except (TypeError, ValueError):
             continue
-        if isinstance(val, float) and val.is_integer():
+        if not math.isfinite(fv) or fv == int(fv):
             continue
-        saw_fraction = True
-        text = str(val)
-        if "." in text:
-            # убрать хвост научной записи, если вдруг
-            frac = text.split(".")[1]
-            frac = frac.split("e")[0].split("E")[0]
-            max_prec = max(max_prec, len(frac))
-    return max_prec if saw_fraction else 1
+        text = np.format_float_positional(fv, trim="-")
+        decimals = len(text.split(".")[1]) if "." in text else 0
+        counts.append(decimals)
+
+    if not counts:
+        return 1
+    reasonable = [d for d in counts if d <= max_reasonable]
+    if not reasonable:
+        return max_reasonable
+    return max(reasonable)
 
 
 def custom_round(x, min_decimals=None):
@@ -211,19 +254,18 @@ def style_dataframe_html(df, data_precision=None):
     data_scale_cols = {0, 4, 5}
 
     def fmt(val, col_idx=None):
-        if val is None or (isinstance(val, float) and np.isnan(val)):
+        if val is None or (isinstance(val, str) and val.strip() == ""):
             return ""
-        if (
-            isinstance(val, (int, float, np.number))
-            and not isinstance(val, (bool, np.bool_))
-            and pd.notna(val)
-            and not np.isinf(val)
-        ):
-            min_decimals = (
-                data_precision if col_idx in data_scale_cols else None
-            )
-            return str(custom_round(float(val), min_decimals=min_decimals))
-        return str(val)
+        if isinstance(val, str):
+            return val
+        try:
+            num = float(val)
+        except (TypeError, ValueError):
+            return str(val)
+        if not math.isfinite(num):
+            return "Не существует" if isinstance(val, (float, np.floating)) else str(val)
+        min_decimals = data_precision if col_idx in data_scale_cols else None
+        return str(custom_round(num, min_decimals=min_decimals))
 
     parts = ["<table>", "<thead><tr><th></th>"]
     for col in df.columns:
@@ -241,14 +283,67 @@ def style_dataframe_html(df, data_precision=None):
     return "".join(parts)
 
 
-uploaded_file = st.file_uploader("Загрузите Excel файл", type=["xls", "xlsx", "xlsm"])
-if uploaded_file:
+st.markdown(
+    """
+    <style>
+    /* Все подписи виджетов — как обычный markdown-текст */
+    [data-testid="stWidgetLabel"] p {
+        font-size: 1rem !important;
+        font-weight: 400 !important;
+        line-height: 1.6 !important;
+    }
+    /* Зона upload и кнопка примера — одна высота */
+    div[data-testid="stHorizontalBlock"]:has([data-testid="stFileUploader"])
+      [data-testid="stFileUploaderDropzone"] {
+        min-height: 5rem;
+        align-items: center;
+    }
+    div[data-testid="stHorizontalBlock"]:has([data-testid="stFileUploader"])
+      > div:nth-child(2) button {
+        min-height: 5rem;
+        width: 100%;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+col_upload, col_sample = st.columns(2)
+with col_upload:
+    st.markdown("Загрузите Excel файл")
+    uploaded_file = st.file_uploader(
+        "Загрузите Excel файл",
+        type=["xls", "xlsx", "xlsm"],
+        label_visibility="collapsed",
+        key="excel_upload",
+    )
+with col_sample:
+    st.markdown("Или воспользуйтесь примером")
+    if st.button(
+        "Загрузить тестовый файл",
+        use_container_width=True,
+        key="load_sample_btn",
+    ):
+        if not SAMPLE_DATA_PATH.is_file():
+            st.error(f"Тестовый файл не найден: {SAMPLE_DATA_PATH.name}")
+            st.stop()
+        st.session_state["use_sample_data"] = True
+        st.rerun()
+
+if uploaded_file is not None:
+    st.session_state["use_sample_data"] = False
+    active_file = uploaded_file
+elif st.session_state.get("use_sample_data"):
+    active_file = load_sample_file()
+else:
+    active_file = None
+
+if active_file:
     try:
-        df = read_excel(uploaded_file)
+        df = read_excel(active_file)
         st.success(
             f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}"
         )
-        log_analytics(uploaded_file=uploaded_file)
+        log_analytics(uploaded_file=active_file)
         update_analytics_file_rows(len(df))
         with st.expander("🔢 Фрагмент загруженных данных", expanded=False):
             st.markdown(df.head().to_html(), unsafe_allow_html=True)
@@ -259,9 +354,13 @@ if uploaded_file:
             st.error("В файле нет числовых столбцов")
             st.stop()
 
+        use_sample = bool(st.session_state.get("use_sample_data"))
         values_col = st.selectbox(
             "Выберите столбец с данными для построения кривой обеспеченности",
             numeric_cols,
+            index=option_index(
+                numeric_cols, SAMPLE_VALUES_COL if use_sample else None
+            ),
         )
         df.rename(columns={values_col: str(values_col)}, inplace=True)
 
@@ -274,11 +373,19 @@ if uploaded_file:
             df = df.dropna(subset=[values_col])
 
         cols.insert(0, "Без группировки")
-        index_col = st.selectbox("Выберите столбец для группировки данных", cols)
+        index_col = st.selectbox(
+            "Выберите столбец для группировки данных",
+            cols,
+            index=option_index(cols, SAMPLE_GROUP_COL if use_sample else None),
+        )
+        aggfunc = None
         if index_col != "Без группировки":
             aggfunc = st.selectbox(
                 "Выберите способ группировки данных",
-                ["Максимальные значения", "Средние значения", "Минимальные значения"],
+                AGG_OPTIONS,
+                index=option_index(
+                    AGG_OPTIONS, SAMPLE_AGG_FUNC if use_sample else None
+                ),
             )
             df.rename(columns={index_col: str(index_col)}, inplace=True)
 
@@ -287,13 +394,8 @@ if uploaded_file:
             expanded=False,
         ):
             if index_col != "Без группировки":
-                aggfunc_dict = {
-                    "Максимальные значения": "max",
-                    "Средние значения": "mean",
-                    "Минимальные значения": "min",
-                }
                 data = df.pivot_table(
-                    index=index_col, values=values_col, aggfunc=aggfunc_dict[aggfunc]
+                    index=index_col, values=values_col, aggfunc=AGG_FUNCS[aggfunc]
                 )
             else:
                 data = df[values_col]
@@ -421,7 +523,7 @@ if uploaded_file:
         )
         if distributions_to_plot:
             log_analytics(
-                uploaded_file=uploaded_file,
+                uploaded_file=active_file,
                 distributions_selected=distributions_to_plot,
             )
 
@@ -470,19 +572,12 @@ if uploaded_file:
         cs = stats.skew(data[values_col])
         parameters_df["Эмпирическое"] = pd.DataFrame([mean, cv, cs, "-", "-", "-", "-"])
 
-        sample = df.loc[0, values_col]
-        if isinstance(sample, (int, np.integer)) or (
-            isinstance(sample, float) and sample.is_integer()
-        ):
-            precision = 1
+        # Среднее по группе даёт длинные float — точность берём из сырой колонки.
+        # Для суммы/мин/макс можно смотреть уже агрегированный ряд.
+        if aggfunc == "Средние значения":
+            precision = detect_decimal_precision(df[values_col])
         else:
-            sample_str = str(sample)
-            if "." in sample_str:
-                precision = len(sample_str.split(".")[1])
-            else:
-                precision = 1
-        # Точность по всему столбцу (не грубее, чем у исходных данных)
-        precision = max(precision, detect_decimal_precision(df[values_col]))
+            precision = detect_decimal_precision(data[values_col])
 
         distribution_params = {}
         distribution_objects = {}
@@ -549,8 +644,8 @@ if uploaded_file:
             plt.plot(x_teor, f2(x_teor), label=teor_label, linewidth=0.7)
 
             df_1[f"{teor_label}"] = df_1["Обеспеченность"].apply(
-                lambda x, dist=selected_dist, p=params: round(
-                    dist.ppf(1 - x / 100, *p), precision
+                lambda x, dist=selected_dist, p=params: custom_round(
+                    dist.ppf(1 - x / 100, *p), min_decimals=precision
                 )
             )
 
@@ -651,7 +746,7 @@ if uploaded_file:
                 or st.session_state.last_logged_p != p
             ):
                 log_analytics(
-                    uploaded_file=uploaded_file,
+                    uploaded_file=active_file,
                     distributions_selected=distributions_to_plot,
                     custom_ensurence_value=p,
                 )
@@ -662,7 +757,10 @@ if uploaded_file:
                 selected_dist = distributions[distribution]
                 params = distribution_params[distribution]
                 teor_label = distribution
-                custom_dict[teor_label] = selected_dist.ppf(1 - p / 100, *params)
+                custom_dict[teor_label] = custom_round(
+                    selected_dist.ppf(1 - p / 100, *params),
+                    min_decimals=precision,
+                )
             custom_df = pd.DataFrame.from_dict(
                 custom_dict, orient="index", columns=["Values"]
             )

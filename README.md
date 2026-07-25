@@ -15,7 +15,7 @@
 🌐 **Онлайн-доступ**
 
 Приложение развернуто в Streamlit Cloud:
-🔗 [https://thesecuritycurves.streamlit.app/](https://thesecuritycurves-mk8pbyd72a3xukqdmtw4vb.streamlit.app/)
+🔗 [https://thesecuritycurves.streamlit.app/](https://thesecuritycurves.streamlit.app/)
 
 📊 **Аналитика использования приложения**
 

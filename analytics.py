@@ -14,7 +14,7 @@ CSV_SEPARATOR = ";"
 ANALYTICS_PATH = "analytics.csv"
 
 # Файлы, которые не должны попадать в аналитику
-TEST_FILES = ["тест.xlsx"]
+TEST_FILES = ["тест.xlsx", "Суточные осадки.xlsx"]
 
 
 def get_session_id():
