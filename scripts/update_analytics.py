@@ -32,6 +32,18 @@ CSV_SEPARATOR = ";"
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GRAPHS_DIR = Path("graphs")
 
+# Должно совпадать с SAMPLE_FILE_NAMES в analytics.py
+SAMPLE_FILE_NAMES = ["tsc_sample__daily_precip.xlsx"]
+
+
+def is_sample_file(filename):
+    """Файл из кнопки «Загрузить тестовый файл»."""
+    if filename is None or (isinstance(filename, float) and pd.isna(filename)):
+        return False
+    name = Path(str(filename)).name.lower()
+    return any(item.lower() == name for item in SAMPLE_FILE_NAMES)
+
+
 def get_analytics_csv():
     """Загружает CSV с аналитикой из GitHub"""
     url = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/contents/analytics.csv"
@@ -61,87 +73,112 @@ def parse_distributions_list(dist_str):
     return [item for item in items if item]
 
 def create_daily_activity_graph(df):
-    """Создает график активности по дням"""
-    # Преобразуем столбец date в datetime
-    df['datetime'] = pd.to_datetime(df['date'])
-    
-    # Определяем вчерашнюю дату как datetime
+    """Создает график активности по дням (обычные загрузки + тестовый файл)."""
+    df = df.copy()
+    df["datetime"] = pd.to_datetime(df["date"])
+
     yesterday = datetime.now() - timedelta(days=1)
     yesterday_date = yesterday.date()
-    
-    # Создаем полный диапазон дат: от "15 дней назад" до "вчера"
-    date_range = pd.date_range(end=yesterday_date, periods=15, freq='D')
-    
-    # Группируем по дате - используем cutoff_date как datetime для сравнения
-    cutoff_date = yesterday - timedelta(days=14)  # 15 дней назад (14 + вчера = 15)
-    
-    # Преобразуем cutoff_date в тот же тип, что и df['datetime']
-    cutoff_date_dt = pd.Timestamp(cutoff_date)
-    
-    # Фильтруем и группируем
-    daily_counts = df[df['datetime'] >= cutoff_date_dt].groupby('date').size().reset_index(name='count')
-    daily_counts['date'] = pd.to_datetime(daily_counts['date'])
-    
-    # Создаем полный DataFrame с всеми датами, заполняя отсутствующие нулями
-    full_dates = pd.DataFrame({'date': date_range})
-    full_counts = pd.merge(full_dates, daily_counts, on='date', how='left').fillna(0)
-    full_counts = full_counts.sort_values('date')
-    
-    # Форматируем даты для отображения
-    dates_display = [d.strftime('%d.%m') for d in full_counts['date']]
-    
-    fig, ax = plt.subplots(figsize=(8, 4))
-    
-    # Убираем границы
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    
-    # Убираем ось Y (левую вертикальную)
-    ax.yaxis.set_visible(False)
-    
-    # Создаем line plot
+    date_range = pd.date_range(end=yesterday_date, periods=15, freq="D")
+    cutoff_date_dt = pd.Timestamp(yesterday - timedelta(days=14))
+
+    recent = df[df["datetime"] >= cutoff_date_dt].copy()
+    recent["_is_sample"] = recent["file_name"].apply(is_sample_file)
+
+    def counts_by_date(frame):
+        if frame.empty:
+            daily = pd.DataFrame(columns=["date", "count"])
+        else:
+            daily = (
+                frame.groupby("date").size().reset_index(name="count")
+            )
+            daily["date"] = pd.to_datetime(daily["date"])
+        full_dates = pd.DataFrame({"date": date_range})
+        merged = pd.merge(full_dates, daily, on="date", how="left").fillna(0)
+        return merged.sort_values("date")
+
+    regular_counts = counts_by_date(recent[~recent["_is_sample"]])
+    sample_counts = counts_by_date(recent[recent["_is_sample"]])
+
+    dates_display = [d.strftime("%d.%m") for d in regular_counts["date"]]
     x = np.arange(len(dates_display))
-    ax.plot(x, full_counts['count'], 
-            marker='o', 
-            markersize=4,
-            color='#3572a5')
-    
-    # Настройка внешнего вида - заголовок сдвинут влево
-    ax.set_title('Динамика количества использований по дням')
-    
-    # Устанавливаем подписи на оси X
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.yaxis.set_visible(False)
+
+    ax.plot(
+        x,
+        regular_counts["count"],
+        marker="o",
+        markersize=4,
+        color="#3572a5",
+        label="Обычные загрузки",
+    )
+    ax.plot(
+        x,
+        sample_counts["count"],
+        marker="o",
+        markersize=4,
+        color="#e67e22",
+        label="Тестовый файл",
+    )
+
+    ax.set_title("Динамика количества использований по дням")
     ax.set_xticks(x)
-    ax.set_xticklabels(dates_display, rotation=45, ha='right')
-    
-    # Настройка пределов оси Y
-    y_max = max(full_counts['count'].max(), 5)
-    ax.set_ylim(bottom=0, top=y_max * 1.1) 
-    
-    # Добавляем значения над точками, пропуская нули
-    for i, v in enumerate(full_counts['count']):
-        if v > 0:  # Только для ненулевых значений
-            ax.text(i, v + (y_max * 0.05), str(int(v)), 
-                    ha='center',
-                    fontsize=10)
-    
+    ax.set_xticklabels(dates_display, rotation=45, ha="right")
+    ax.legend(frameon=False, loc="upper left")
+
+    y_max = max(
+        regular_counts["count"].max(),
+        sample_counts["count"].max(),
+        5,
+    )
+    ax.set_ylim(bottom=0, top=y_max * 1.15)
+
+    for i, v in enumerate(regular_counts["count"]):
+        if v > 0:
+            ax.text(
+                i,
+                v + (y_max * 0.05),
+                str(int(v)),
+                ha="center",
+                fontsize=9,
+                color="#3572a5",
+            )
+    for i, v in enumerate(sample_counts["count"]):
+        if v > 0:
+            ax.text(
+                i,
+                v + (y_max * 0.12),
+                str(int(v)),
+                ha="center",
+                fontsize=9,
+                color="#e67e22",
+            )
+
     plt.tight_layout()
-    
-    # Сохраняем график
     GRAPHS_DIR.mkdir(exist_ok=True)
-    plt.savefig(GRAPHS_DIR / 'daily_activity.png', 
-                dpi=100, 
-                bbox_inches='tight',
-                facecolor='white',
-                edgecolor='none')
+    plt.savefig(
+        GRAPHS_DIR / "daily_activity.png",
+        dpi=100,
+        bbox_inches="tight",
+        facecolor="white",
+        edgecolor="none",
+    )
     plt.close()
-    
     return True
 
+
 def create_distributions_graph(df):
-    """Создает график популярности распределений"""
+    """Создает график популярности распределений (без тестового файла)."""
+    df = df.copy()
+    df = df[~df["file_name"].apply(is_sample_file)]
+
     all_distributions = []
-    for dist_str in df['distributions_selected'].dropna():
+    for dist_str in df["distributions_selected"].dropna():
         distributions = parse_distributions_list(dist_str)
         all_distributions.extend(distributions)
 
@@ -204,6 +241,7 @@ def create_distributions_graph(df):
     plt.close()
     
     return True
+
 
 def update_readme_with_analytics():
     """Обновляет README.md с новой аналитикой"""

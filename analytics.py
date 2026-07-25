@@ -3,6 +3,7 @@
 import base64
 import uuid
 from datetime import date, datetime
+from pathlib import Path
 
 import requests
 import streamlit as st
@@ -13,8 +14,11 @@ GITHUB_BRANCH = "main"
 CSV_SEPARATOR = ";"
 ANALYTICS_PATH = "analytics.csv"
 
-# Файлы, которые не должны попадать в аналитику
-TEST_FILES = ["тест.xlsx", "Суточные осадки.xlsx"]
+# Полностью не пишем в analytics.csv
+EXCLUDED_FROM_ANALYTICS = ["тест.xlsx"]
+
+# Пишем в CSV, но на графиках учитываем отдельно (кнопка «тестовый файл»)
+SAMPLE_FILE_NAMES = ["tsc_sample__daily_precip.xlsx"]
 
 
 def get_session_id():
@@ -79,11 +83,25 @@ def save_to_github(token, sha, content):
         return False
 
 
-def is_test_file(filename):
-    """Проверяет, является ли файл тестовым."""
+def is_excluded_from_analytics(filename):
+    """Файлы, которые совсем не пишем в analytics.csv."""
     if not filename:
         return False
-    return any(test_file.lower() in filename.lower() for test_file in TEST_FILES)
+    name = Path(str(filename)).name.lower()
+    return any(item.lower() == name for item in EXCLUDED_FROM_ANALYTICS)
+
+
+def is_sample_file(filename):
+    """Файл из кнопки «Загрузить тестовый файл»."""
+    if not filename:
+        return False
+    name = Path(str(filename)).name.lower()
+    return any(item.lower() == name for item in SAMPLE_FILE_NAMES)
+
+
+def is_test_file(filename):
+    """Обратная совместимость: исключённые + пример."""
+    return is_excluded_from_analytics(filename) or is_sample_file(filename)
 
 
 def format_list_for_csv(items):
@@ -111,7 +129,7 @@ def log_analytics(uploaded_file=None, distributions_selected=None, custom_ensure
         if not token or not uploaded_file:
             return False
 
-        if is_test_file(uploaded_file.name):
+        if is_excluded_from_analytics(uploaded_file.name):
             return False
 
         session_id = get_session_id()
@@ -225,7 +243,7 @@ def update_analytics_file_rows(file_rows):
             if lines[i].strip() and session_id in lines[i]:
                 parts = lines[i].split(CSV_SEPARATOR)
                 if len(parts) > 5:
-                    if len(parts) > 3 and is_test_file(parts[3]):
+                    if len(parts) > 3 and is_excluded_from_analytics(parts[3]):
                         lines.pop(i)
                     else:
                         parts[5] = str(file_rows)

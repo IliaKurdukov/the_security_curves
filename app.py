@@ -26,8 +26,11 @@ from distributions import (
     km_coefficient_of_variation,
 )
 from excel_io import read_excel
+from report_io import build_results_docx
 
-SAMPLE_DATA_PATH = Path(__file__).resolve().parent / "examples" / "Суточные осадки.xlsx"
+SAMPLE_DATA_PATH = (
+    Path(__file__).resolve().parent / "examples" / "tsc_sample__daily_precip.xlsx"
+)
 SAMPLE_VALUES_COL = "Осадки, мм"
 SAMPLE_GROUP_COL = "Год"
 SAMPLE_AGG_FUNC = "Максимальные значения"
@@ -268,7 +271,9 @@ def style_dataframe_html(df, data_precision=None):
         min_decimals = data_precision if col_idx in data_scale_cols else None
         return str(custom_round(num, min_decimals=min_decimals))
 
-    parts = ["<table>", "<thead><tr><th></th>"]
+    parts = ["<table>", "<thead><tr>"]
+    corner = df.columns.name or df.index.name or "Распределение"
+    parts.append(f"<th>{corner}</th>")
     for col in df.columns:
         parts.append(f"<th>{col}</th>")
     parts.append("</tr></thead><tbody>")
@@ -304,580 +309,793 @@ st.markdown(
         min-height: 5rem;
         width: 100%;
     }
+    /* Вкладки на всю ширину страницы */
+    div[data-testid="stTabs"] [data-baseweb="tab-list"] {
+        width: 100%;
+        gap: 0.25rem;
+    }
+    div[data-testid="stTabs"] [data-baseweb="tab"] {
+        flex: 1 1 0;
+        justify-content: center;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
-col_upload, col_sample = st.columns(2)
-with col_upload:
-    st.markdown("Загрузите Excel файл")
-    uploaded_file = st.file_uploader(
-        "Загрузите Excel файл",
-        type=["xls", "xlsx", "xlsm"],
-        label_visibility="collapsed",
-        key="excel_upload",
-    )
-with col_sample:
-    st.markdown("Или воспользуйтесь примером")
-    if st.button(
-        "Загрузить тестовый файл",
-        use_container_width=True,
-        key="load_sample_btn",
-    ):
-        if not SAMPLE_DATA_PATH.is_file():
-            st.error(f"Тестовый файл не найден: {SAMPLE_DATA_PATH.name}")
-            st.stop()
-        st.session_state["use_sample_data"] = True
-        st.rerun()
 
-if uploaded_file is not None:
-    st.session_state["use_sample_data"] = False
-    active_file = uploaded_file
-elif st.session_state.get("use_sample_data"):
-    active_file = load_sample_file()
-else:
-    active_file = None
+tab_load, tab_prep, tab_process, tab_results = st.tabs(
+    [
+        "Загрузка данных",
+        "Подготовка данных",
+        "Обработка данных",
+        "Вывод результатов",
+    ]
+)
 
-if active_file:
-    try:
-        df = read_excel(active_file)
-        st.success(
-            f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}"
-        )
-        log_analytics(uploaded_file=active_file)
-        update_analytics_file_rows(len(df))
-        with st.expander("🔢 Фрагмент загруженных данных", expanded=False):
-            st.markdown(df.head().to_html(), unsafe_allow_html=True)
+active_file = None
+df = None
+prep_ok = False
+process_ok = False
+series_df = None
+data_empirical = None
+values_col = None
+index_col = None
+precision = 1
+results_curve_png = None
+results_parameters_df = None
+results_quantiles_df = None
 
-        numeric_cols = df.select_dtypes(include=["number"]).columns
-        cols = df.columns.tolist()
-        if len(numeric_cols) == 0:
-            st.error("В файле нет числовых столбцов")
-            st.stop()
-
-        use_sample = bool(st.session_state.get("use_sample_data"))
-        values_col = st.selectbox(
-            "Выберите столбец с данными для построения кривой обеспеченности",
-            numeric_cols,
-            index=option_index(
-                numeric_cols, SAMPLE_VALUES_COL if use_sample else None
-            ),
-        )
-        df.rename(columns={values_col: str(values_col)}, inplace=True)
-
-        null_count = df[values_col].isna().sum()
-        if null_count > 0:
-            st.markdown(
-                "В данных обнаружены и удалены для работы пропуски в следующих строках:"
-            )
-            st.markdown(df[df[values_col].isna()].to_html(), unsafe_allow_html=True)
-            df = df.dropna(subset=[values_col])
-
-        cols.insert(0, "Без группировки")
-        index_col = st.selectbox(
-            "Выберите столбец для группировки данных",
-            cols,
-            index=option_index(cols, SAMPLE_GROUP_COL if use_sample else None),
-        )
-        aggfunc = None
-        if index_col != "Без группировки":
-            aggfunc = st.selectbox(
-                "Выберите способ группировки данных",
-                AGG_OPTIONS,
-                index=option_index(
-                    AGG_OPTIONS, SAMPLE_AGG_FUNC if use_sample else None
-                ),
-            )
-            df.rename(columns={index_col: str(index_col)}, inplace=True)
-
-        if index_col != "Без группировки":
-            series_df = (
-                df.pivot_table(
-                    index=index_col, values=values_col, aggfunc=AGG_FUNCS[aggfunc]
-                )
-                .reset_index()
-            )
-        else:
-            series_df = pd.DataFrame(
-                {values_col: df[values_col].to_numpy(copy=True)}
-            )
-
-        # Среднее по группе даёт длинные float — точность берём из сырой колонки.
-        # Для суммы/мин/макс можно смотреть уже агрегированный ряд.
-        if aggfunc == "Средние значения":
-            precision = detect_decimal_precision(df[values_col])
-        else:
-            precision = detect_decimal_precision(series_df[values_col])
-
-        series_full = series_df.copy()
-        x_full = (
-            series_full[index_col]
-            if index_col != "Без группировки"
-            else series_full.index
-        )
-        with st.expander("📊 График хода значений", expanded=False):
-            fig_plotly = go.Figure(
-                data=[
-                    go.Scatter(
-                        x=list(x_full),
-                        y=series_full[values_col].tolist(),
-                        mode="lines+markers",
-                        marker={"size": 6},
-                        line={"width": 1},
-                        name=values_col,
-                    )
-                ]
-            )
-            fig_plotly.update_layout(
-                title="График хода значений",
-                xaxis_title=index_col if index_col != "Без группировки" else "Индекс",
-                yaxis_title=values_col,
-                height=360,
-                margin={"l": 40, "r": 20, "t": 40, "b": 40},
-            )
-            st.plotly_chart(fig_plotly, use_container_width=True)
-
-        exclude_options = []
-        exclude_key_to_pos = {}
-        for pos in range(len(series_df)):
-            val_txt = custom_round(
-                series_df.iloc[pos][values_col], min_decimals=precision
-            )
-            if index_col != "Без группировки":
-                label = f"{series_df.iloc[pos][index_col]} - {val_txt}"
-            else:
-                label = str(val_txt)
-            base = label
-            suffix = 2
-            while label in exclude_key_to_pos:
-                label = f"{base} ({suffix})"
-                suffix += 1
-            exclude_key_to_pos[label] = pos
-            exclude_options.append(label)
-
-        excluded_labels = st.multiselect(
-            "Выберите данные для исключения из дальнейшего расчета",
-            exclude_options,
-        )
-        if excluded_labels:
-            drop_positions = {exclude_key_to_pos[label] for label in excluded_labels}
-            series_df = series_df.drop(
-                index=[series_df.index[p] for p in sorted(drop_positions)]
-            ).reset_index(drop=True)
-
-        if len(series_df) < 3:
-            st.error(
-                "После исключения осталось слишком мало данных для расчета "
-                "(нужно не менее 3 значений)."
-            )
-            st.stop()
-
-        data = series_df.copy()
-        n = len(data)
-        data["Ранг"] = np.arange(1, n + 1)
-        max_rank_plus_one = n + 1
-        data["Вероятность"] = data["Ранг"] / max_rank_plus_one
-        data["Обеспеченность P, %"] = round(data["Вероятность"] * 100, 2)
-        data_to_merge = data.sort_values(by=values_col, ascending=False)
-        data_to_merge.drop(
-            ["Вероятность", "Обеспеченность P, %", "Ранг"], axis=1, inplace=True
-        )
-        data_to_merge.rename(columns={values_col: values_col + " (P)"}, inplace=True)
-        if index_col != "Без группировки":
-            data_to_merge.rename(
-                columns={index_col: index_col + " (P)"}, inplace=True
-            )
-        data_to_merge["Ранг"] = np.arange(1, n + 1)
-        data = data.merge(data_to_merge, on="Ранг")
-        data.set_index("Ранг", inplace=True)
-
-        with st.expander(
-            "🔢 Хронологический ряд значений и эмпирическое распределение",
-            expanded=False,
-        ):
-            if index_col != "Без группировки":
-                st.markdown(
-                    data[
-                        [
-                            index_col,
-                            values_col,
-                            "Обеспеченность P, %",
-                            values_col + " (P)",
-                            index_col + " (P)",
-                        ]
-                    ].to_html(),
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    data[
-                        [values_col, "Обеспеченность P, %", values_col + " (P)"]
-                    ].to_html(),
-                    unsafe_allow_html=True,
-                )
-
-        with st.expander("📊 График хода значений", expanded=False):
-            fig, ax = plt.subplots(figsize=(12, 6))
-            x = (
-                series_df[index_col]
-                if index_col != "Без группировки"
-                else series_df.index
-            )
-            y = series_df[values_col]
-            plt.plot(x, y, linewidth=1.5)
-            ax.set_ylabel(values_col, fontsize=12)
-            ax.set_title("График хода значений", fontsize=14)
-            ax.tick_params(axis="x", labelsize=11)
-            ax.tick_params(axis="y", labelsize=11)
-            st.pyplot(fig, width="content")
-
-        data = data.sort_values(by=values_col)
-
-        data_min = data[values_col].min()
-        data_max = data[values_col].max()
-        distributions = build_distributions(data_min, data_max)
-
-        st.markdown(
-            """
-            <style>
-            .dist-tooltip {
-                position: relative;
-                display: inline-block;
-                cursor: help;
-                margin-left: 5px;
-            }
-            .dist-tooltip .dist-tooltiptext {
-                visibility: hidden;
-                width: 220px;
-                background-color: #333;
-                color: #fff;
-                text-align: left;
-                border-radius: 6px;
-                padding: 10px;
-                position: absolute;
-                z-index: 1000;
-                bottom: 125%;
-                left: 50%;
-                margin-left: -110px;
-                opacity: 0;
-                transition: opacity 0.3s;
-                font-size: 12px;
-                line-height: 1.5;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            }
-            .dist-tooltip .dist-tooltiptext::after {
-                content: "";
-                position: absolute;
-                top: 100%;
-                left: 50%;
-                margin-left: -5px;
-                border-width: 5px;
-                border-style: solid;
-                border-color: #333 transparent transparent transparent;
-            }
-            .dist-tooltip:hover .dist-tooltiptext {
-                visibility: visible;
-                opacity: 1;
-            }
-            </style>
-            <div style="display: flex; align-items: center;">
-                <span>Выберите распределение для аппроксимации</span>
-                <div class="dist-tooltip">
-                    <span style="font-size: 16px; color: #666;">ⓘ</span>
-                    <span class="dist-tooltiptext">
-                        <b>Расшифровка аббревиатур:</b><br>
-                        • <b>ММП</b> - метод максимального правдоподобия<br>
-                        • <b>Мом</b> - метод моментов<br>
-                        • <b>L-мом</b> - метод L-моментов
-                    </span>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        distributions_to_plot = st.multiselect(
-            "",
-            distributions,
-            default=[list(distributions)[-1]],
+with tab_load:
+    col_upload, col_sample = st.columns(2)
+    with col_upload:
+        st.markdown("Загрузите Excel файл")
+        uploaded_file = st.file_uploader(
+            "Загрузите Excel файл",
+            type=["xls", "xlsx", "xlsm"],
             label_visibility="collapsed",
+            key="excel_upload",
         )
-        if distributions_to_plot:
-            log_analytics(
-                uploaded_file=active_file,
-                distributions_selected=distributions_to_plot,
+    with col_sample:
+        st.markdown("Или воспользуйтесь примером")
+        if st.button(
+            "Загрузить тестовый файл",
+            use_container_width=True,
+            key="load_sample_btn",
+        ):
+            if not SAMPLE_DATA_PATH.is_file():
+                st.error(f"Тестовый файл не найден: {SAMPLE_DATA_PATH.name}")
+                st.stop()
+            st.session_state["use_sample_data"] = True
+            st.rerun()
+
+    if uploaded_file is not None:
+        st.session_state["use_sample_data"] = False
+        active_file = uploaded_file
+    elif st.session_state.get("use_sample_data"):
+        active_file = load_sample_file()
+    else:
+        active_file = None
+
+    if active_file:
+        try:
+            df = read_excel(active_file)
+            st.success(
+                f"Данные успешно загружены и содержат {len(df)} {pluralize_rows(len(df))}"
             )
+            log_analytics(uploaded_file=active_file)
+            update_analytics_file_rows(len(df))
+            with st.expander("🔢 Фрагмент загруженных данных", expanded=False):
+                st.markdown(df.head().to_html(), unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Ошибка: {str(e)}")
+            df = None
+            active_file = None
+    else:
+        st.info("Загрузите Excel-файл или тестовый пример, чтобы продолжить.")
 
-        def scalefunc(x):
-            return stats.norm.ppf(x / 100, loc=0, scale=1)
+with tab_prep:
+    if df is None:
+        st.info("Сначала загрузите данные во вкладке «Загрузка данных».")
+    else:
+        try:
+            numeric_cols = df.select_dtypes(include=["number"]).columns
+            cols = df.columns.tolist()
+            if len(numeric_cols) == 0:
+                st.error("В файле нет числовых столбцов")
+            else:
+                use_sample = bool(st.session_state.get("use_sample_data"))
+                values_col = st.selectbox(
+                    "Выберите столбец с данными для построения кривой обеспеченности",
+                    numeric_cols,
+                    index=option_index(
+                        numeric_cols, SAMPLE_VALUES_COL if use_sample else None
+                    ),
+                )
+                df.rename(columns={values_col: str(values_col)}, inplace=True)
 
-        fig, ax = plt.subplots(figsize=(12, 6))
-
-        x = data["Вероятность"] * 100
-        y = data[values_col + " (P)"]
-        plt.scatter(
-            x,
-            y,
-            label="Эмпирическое",
-            s=36,
-            facecolors="none",
-            edgecolors="black",
-            linewidths=1.2,
-        )
-
-        percent_list_1 = [
-            0.01,
-            0.1,
-            0.33,
-            0.5,
-            1,
-            2,
-            3,
-            5,
-            10,
-            50,
-            63,
-            90,
-            95,
-            98,
-            99,
-            99.9,
-        ]
-        df_1 = pd.DataFrame(percent_list_1, columns=["Обеспеченность"])
-
-        parameters = ["Среднее", "Cv", "Cs", "R²", "MAE", "maxE", "A-D"]
-        parameters_df = pd.DataFrame(parameters, columns=["Распределение"])
-        mean = data[values_col].mean()
-        std = data[values_col].std()
-        cv = std / mean
-        cs = stats.skew(data[values_col])
-        parameters_df["Эмпирическое"] = pd.DataFrame([mean, cv, cs, "-", "-", "-", "-"])
-
-        distribution_params = {}
-        distribution_objects = {}
-
-        range1 = np.arange(0.1, 1.1, 0.2)
-        range2 = np.arange(1.1, 2.0, 0.3)
-        range3 = np.arange(2.0, 98.0, 1.0)
-        range4 = np.arange(98.0, 98.9, 0.3)
-        range5 = np.arange(98.9, 99.9, 0.2)
-        x_teor = np.concatenate([range1, range2, range3, range4, range5, [99.9]])
-
-        for distribution in distributions_to_plot:
-            selected_dist = distributions[distribution]
-            params = selected_dist.fit(data[values_col])
-            distribution_params[distribution] = params
-
-            predict = data["Вероятность"].apply(
-                lambda x, dist=selected_dist, p=params: dist.ppf(1 - x, *p)
-            )
-            r2 = r2_score(data[values_col + " (P)"], predict)
-            mae = mean_absolute_error(data[values_col + " (P)"], predict)
-            maxE = max_error(data[values_col + " (P)"], predict)
-
-            try:
-                if isinstance(selected_dist, ScipyDistributionAdapter):
-                    fitted_dist = selected_dist._dist(*params)
-                    distribution_objects[distribution] = fitted_dist
-                    cdf_func = fitted_dist.cdf
-                elif isinstance(selected_dist, LMomentsDistributionAdapter):
-                    fitted_dist = create_scipy_dist_from_lmoments(
-                        selected_dist._lmoments_name, params
+                null_count = df[values_col].isna().sum()
+                if null_count > 0:
+                    st.markdown(
+                        "В данных обнаружены и удалены для работы пропуски "
+                        "в следующих строках:"
                     )
-                    distribution_objects[distribution] = fitted_dist
-                    cdf_func = fitted_dist.cdf
+                    st.markdown(
+                        df[df[values_col].isna()].to_html(),
+                        unsafe_allow_html=True,
+                    )
+                    df = df.dropna(subset=[values_col])
+
+                cols.insert(0, "Без группировки")
+                index_col = st.selectbox(
+                    "Выберите столбец для группировки данных",
+                    cols,
+                    index=option_index(
+                        cols, SAMPLE_GROUP_COL if use_sample else None
+                    ),
+                )
+                aggfunc = None
+                if index_col != "Без группировки":
+                    aggfunc = st.selectbox(
+                        "Выберите способ группировки данных",
+                        AGG_OPTIONS,
+                        index=option_index(
+                            AGG_OPTIONS, SAMPLE_AGG_FUNC if use_sample else None
+                        ),
+                    )
+                    df.rename(columns={index_col: str(index_col)}, inplace=True)
+
+                if index_col != "Без группировки":
+                    series_df = (
+                        df.pivot_table(
+                            index=index_col,
+                            values=values_col,
+                            aggfunc=AGG_FUNCS[aggfunc],
+                        )
+                        .reset_index()
+                    )
+                else:
+                    series_df = pd.DataFrame(
+                        {values_col: df[values_col].to_numpy(copy=True)}
+                    )
+
+                if aggfunc == "Средние значения":
+                    precision = detect_decimal_precision(df[values_col])
+                else:
+                    precision = detect_decimal_precision(series_df[values_col])
+
+                exclude_options = []
+                exclude_key_to_pos = {}
+                for pos in range(len(series_df)):
+                    val_txt = custom_round(
+                        series_df.iloc[pos][values_col], min_decimals=precision
+                    )
+                    if index_col != "Без группировки":
+                        label = f"{series_df.iloc[pos][index_col]} - {val_txt}"
+                    else:
+                        label = str(val_txt)
+                    base = label
+                    suffix = 2
+                    while label in exclude_key_to_pos:
+                        label = f"{base} ({suffix})"
+                        suffix += 1
+                    exclude_key_to_pos[label] = pos
+                    exclude_options.append(label)
+
+                excluded_labels = st.multiselect(
+                    "Выберите данные для исключения из дальнейшего расчета",
+                    exclude_options,
+                )
+                if excluded_labels:
+                    drop_positions = {
+                        exclude_key_to_pos[label] for label in excluded_labels
+                    }
+                    series_df = series_df.drop(
+                        index=[series_df.index[p] for p in sorted(drop_positions)]
+                    ).reset_index(drop=True)
+
+                x_plot = (
+                    series_df[index_col]
+                    if index_col != "Без группировки"
+                    else series_df.index
+                )
+                with st.expander("📊 График хода значений", expanded=False):
+                    fig_plotly = go.Figure(
+                        data=[
+                            go.Scatter(
+                                x=list(x_plot),
+                                y=series_df[values_col].tolist(),
+                                mode="lines+markers",
+                                marker={"size": 6},
+                                line={"width": 1},
+                                name=values_col,
+                            )
+                        ]
+                    )
+                    fig_plotly.update_layout(
+                        title="График хода значений",
+                        xaxis_title=(
+                            index_col
+                            if index_col != "Без группировки"
+                            else "Индекс"
+                        ),
+                        yaxis_title=values_col,
+                        height=360,
+                        margin={"l": 40, "r": 20, "t": 40, "b": 40},
+                    )
+                    st.plotly_chart(fig_plotly, use_container_width=True)
+
+                if len(series_df) < 3:
+                    st.error(
+                        "После исключения осталось слишком мало данных для расчета "
+                        "(нужно не менее 3 значений)."
+                    )
+                else:
+                    data = series_df.copy()
+                    n = len(data)
+                    data["Ранг"] = np.arange(1, n + 1)
+                    max_rank_plus_one = n + 1
+                    data["Вероятность"] = data["Ранг"] / max_rank_plus_one
+                    data["Обеспеченность P, %"] = round(data["Вероятность"] * 100, 2)
+                    data_to_merge = data.sort_values(by=values_col, ascending=False)
+                    data_to_merge.drop(
+                        ["Вероятность", "Обеспеченность P, %", "Ранг"],
+                        axis=1,
+                        inplace=True,
+                    )
+                    data_to_merge.rename(
+                        columns={values_col: values_col + " (P)"}, inplace=True
+                    )
+                    if index_col != "Без группировки":
+                        data_to_merge.rename(
+                            columns={index_col: index_col + " (P)"}, inplace=True
+                        )
+                    data_to_merge["Ранг"] = np.arange(1, n + 1)
+                    data = data.merge(data_to_merge, on="Ранг")
+                    data.set_index("Ранг", inplace=True)
+                    data_empirical = data.copy()
+                    prep_ok = True
+        except Exception as e:
+            st.error(f"Ошибка: {str(e)}")
+            prep_ok = False
+
+with tab_process:
+    if not prep_ok:
+        st.info(
+            "Сначала подготовьте данные во вкладке «Подготовка данных»."
+        )
+    else:
+        try:
+            data = data_empirical.sort_values(by=values_col)
+
+            data_min = data[values_col].min()
+            data_max = data[values_col].max()
+            distributions = build_distributions(data_min, data_max)
+
+            st.markdown(
+                """
+                <style>
+                .dist-tooltip {
+                    position: relative;
+                    display: inline-block;
+                    cursor: help;
+                    margin-left: 5px;
+                }
+                .dist-tooltip .dist-tooltiptext {
+                    visibility: hidden;
+                    width: 220px;
+                    background-color: #333;
+                    color: #fff;
+                    text-align: left;
+                    border-radius: 6px;
+                    padding: 10px;
+                    position: absolute;
+                    z-index: 1000;
+                    bottom: 125%;
+                    left: 50%;
+                    margin-left: -110px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 12px;
+                    line-height: 1.5;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                }
+                .dist-tooltip .dist-tooltiptext::after {
+                    content: "";
+                    position: absolute;
+                    top: 100%;
+                    left: 50%;
+                    margin-left: -5px;
+                    border-width: 5px;
+                    border-style: solid;
+                    border-color: #333 transparent transparent transparent;
+                }
+                .dist-tooltip:hover .dist-tooltiptext {
+                    visibility: visible;
+                    opacity: 1;
+                }
+                </style>
+                <div style="display: flex; align-items: center;">
+                    <span>Выберите распределение для аппроксимации</span>
+                    <div class="dist-tooltip">
+                        <span style="font-size: 16px; color: #666;">ⓘ</span>
+                        <span class="dist-tooltiptext">
+                            <b>Расшифровка аббревиатур:</b><br>
+                            • <b>ММП</b> - метод максимального правдоподобия<br>
+                            • <b>Мом</b> - метод моментов<br>
+                            • <b>L-мом</b> - метод L-моментов
+                        </span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            distributions_to_plot = st.multiselect(
+                "",
+                distributions,
+                default=[list(distributions)[-1]],
+                label_visibility="collapsed",
+            )
+            if distributions_to_plot:
+                log_analytics(
+                    uploaded_file=active_file,
+                    distributions_selected=distributions_to_plot,
+                )
+
+            def scalefunc(x):
+                return stats.norm.ppf(x / 100, loc=0, scale=1)
+
+            fig, ax = plt.subplots(figsize=(12, 6))
+
+            x = data["Вероятность"] * 100
+            y = data[values_col + " (P)"]
+            plt.scatter(
+                x,
+                y,
+                label="Эмпирическое",
+                s=36,
+                facecolors="none",
+                edgecolors="black",
+                linewidths=1.2,
+            )
+
+            percent_list_1 = [
+                0.01,
+                0.1,
+                0.33,
+                0.5,
+                1,
+                2,
+                3,
+                5,
+                10,
+                50,
+                63,
+                90,
+                95,
+                98,
+                99,
+                99.9,
+            ]
+            file_key = getattr(active_file, "name", None)
+            if st.session_state.get("_ensurance_file_key") != file_key:
+                st.session_state.added_ensurance_values = []
+                st.session_state["_ensurance_file_key"] = file_key
+            added_p = list(st.session_state.get("added_ensurance_values", []))
+            all_percents = sorted(set(percent_list_1) | set(added_p))
+            df_1 = pd.DataFrame(all_percents, columns=["Обеспеченность"])
+
+            parameters = ["Среднее", "Cv", "Cs", "R²", "MAE", "maxE", "A-D"]
+            parameters_df = pd.DataFrame(parameters, columns=["Распределение"])
+            mean = data[values_col].mean()
+            std = data[values_col].std()
+            cv = std / mean
+            cs = stats.skew(data[values_col])
+            parameters_df["Эмпирическое"] = pd.DataFrame(
+                [mean, cv, cs, "-", "-", "-", "-"]
+            )
+
+            distribution_params = {}
+            distribution_objects = {}
+
+            range1 = np.arange(0.1, 1.1, 0.2)
+            range2 = np.arange(1.1, 2.0, 0.3)
+            range3 = np.arange(2.0, 98.0, 1.0)
+            range4 = np.arange(98.0, 98.9, 0.3)
+            range5 = np.arange(98.9, 99.9, 0.2)
+            x_teor = np.concatenate(
+                [range1, range2, range3, range4, range5, [99.9]]
+            )
+
+            for distribution in distributions_to_plot:
+                selected_dist = distributions[distribution]
+                params = selected_dist.fit(data[values_col])
+                distribution_params[distribution] = params
+
+                predict = data["Вероятность"].apply(
+                    lambda x, dist=selected_dist, p=params: dist.ppf(1 - x, *p)
+                )
+                r2 = r2_score(data[values_col + " (P)"], predict)
+                mae = mean_absolute_error(data[values_col + " (P)"], predict)
+                maxE = max_error(data[values_col + " (P)"], predict)
+
+                try:
+                    if isinstance(selected_dist, ScipyDistributionAdapter):
+                        fitted_dist = selected_dist._dist(*params)
+                        distribution_objects[distribution] = fitted_dist
+                        cdf_func = fitted_dist.cdf
+                    elif isinstance(selected_dist, LMomentsDistributionAdapter):
+                        fitted_dist = create_scipy_dist_from_lmoments(
+                            selected_dist._lmoments_name, params
+                        )
+                        distribution_objects[distribution] = fitted_dist
+                        cdf_func = fitted_dist.cdf
+                    elif (
+                        isinstance(selected_dist, CustomDistributionAdapter)
+                        and "Гумбеля (Мом)" in distribution
+                    ):
+                        fitted_dist = stats.gumbel_r(
+                            loc=params[0], scale=params[1]
+                        )
+                        distribution_objects[distribution] = fitted_dist
+                        cdf_func = fitted_dist.cdf
+                    elif isinstance(selected_dist, KrytskyMenkelAdapter):
+                        cdf_func = (
+                            lambda x, dist=selected_dist, p=params: dist.cdf_original(
+                                x, *p
+                            )
+                        )
+                    elif isinstance(selected_dist, CustomDistributionAdapter):
+
+                        def cdf_func(x, dist_name=distribution, p=params):
+                            return np.nan
+
+                    ad_stat = anderson_darling_test(
+                        data[values_col].values, cdf_func
+                    )
+
+                except Exception as e:
+                    st.warning(
+                        f"Не удалось рассчитать A-D статистику для "
+                        f"{distribution}: {str(e)}"
+                    )
+                    ad_stat = np.nan
+
+                def f(x, dist=selected_dist, p=params):
+                    return dist.ppf(1 - x / 100, *p)
+
+                f2 = np.vectorize(f)
+                teor_label = distribution
+                plt.plot(x_teor, f2(x_teor), label=teor_label, linewidth=1.8)
+
+                df_1[f"{teor_label}"] = df_1["Обеспеченность"].apply(
+                    lambda x, dist=selected_dist, p=params: custom_round(
+                        dist.ppf(1 - x / 100, *p), min_decimals=precision
+                    )
+                )
+
+                if isinstance(selected_dist, ScipyDistributionAdapter):
+                    if distribution in distribution_objects:
+                        dist = distribution_objects[distribution]
+                    else:
+                        dist = selected_dist._dist(*params)
+                    mean = dist.mean()
+                    std = dist.std()
+                    cv = format_stat(std / mean)
+                    cs = format_stat(dist.stats(moments="s"))
+                elif isinstance(selected_dist, LMomentsDistributionAdapter):
+                    try:
+                        if distribution in distribution_objects:
+                            dist = distribution_objects[distribution]
+                        else:
+                            dist = create_scipy_dist_from_lmoments(
+                                selected_dist._lmoments_name, params
+                            )
+
+                        mean = dist.mean()
+                        std = dist.std()
+                        cv = format_stat(std / mean)
+                        cs = format_stat(dist.stats(moments="s"))
+                    except Exception as e:
+                        st.warning(
+                            f"Ошибка при расчете статистик для "
+                            f"{distribution}: {str(e)}"
+                        )
+                        mean = "Ошибка"
+                        cv = "Ошибка"
+                        cs = "Ошибка"
+                elif isinstance(selected_dist, KrytskyMenkelAdapter):
+                    try:
+                        γ, a, b = params
+                        mean = selected_dist.mean_original(γ, a, b)
+                        cv = format_stat(km_coefficient_of_variation(γ, a, b))
+                        cs = format_stat(km_coefficient_of_skewness(γ, a, b))
+                    except Exception as e:
+                        st.warning(
+                            f"Ошибка при расчете статистик для "
+                            f"{distribution}: {str(e)}"
+                        )
+                        mean = "Ошибка"
+                        cv = "Ошибка"
+                        cs = "Ошибка"
                 elif (
                     isinstance(selected_dist, CustomDistributionAdapter)
                     and "Гумбеля (Мом)" in distribution
                 ):
-                    fitted_dist = stats.gumbel_r(loc=params[0], scale=params[1])
-                    distribution_objects[distribution] = fitted_dist
-                    cdf_func = fitted_dist.cdf
-                elif isinstance(selected_dist, KrytskyMenkelAdapter):
-                    cdf_func = lambda x, dist=selected_dist, p=params: dist.cdf_original(
-                        x, *p
-                    )
-                elif isinstance(selected_dist, CustomDistributionAdapter):
-
-                    def cdf_func(x, dist_name=distribution, p=params):
-                        return np.nan
-
-                ad_stat = anderson_darling_test(data[values_col].values, cdf_func)
-
-            except Exception as e:
-                st.warning(
-                    f"Не удалось рассчитать A-D статистику для {distribution}: {str(e)}"
-                )
-                ad_stat = np.nan
-
-            def f(x, dist=selected_dist, p=params):
-                return dist.ppf(1 - x / 100, *p)
-
-            f2 = np.vectorize(f)
-            teor_label = distribution
-            plt.plot(x_teor, f2(x_teor), label=teor_label, linewidth=1.8)
-
-            df_1[f"{teor_label}"] = df_1["Обеспеченность"].apply(
-                lambda x, dist=selected_dist, p=params: custom_round(
-                    dist.ppf(1 - x / 100, *p), min_decimals=precision
-                )
-            )
-
-            if isinstance(selected_dist, ScipyDistributionAdapter):
-                if distribution in distribution_objects:
-                    dist = distribution_objects[distribution]
-                else:
-                    dist = selected_dist._dist(*params)
-                mean = dist.mean()
-                std = dist.std()
-                cv = format_stat(std / mean)
-                cs = format_stat(dist.stats(moments="s"))
-            elif isinstance(selected_dist, LMomentsDistributionAdapter):
-                try:
-                    if distribution in distribution_objects:
-                        dist = distribution_objects[distribution]
-                    else:
-                        dist = create_scipy_dist_from_lmoments(
-                            selected_dist._lmoments_name, params
+                    try:
+                        dist = stats.gumbel_r(loc=params[0], scale=params[1])
+                        mean = dist.mean()
+                        std = dist.std()
+                        cv = format_stat(std / mean)
+                        cs = format_stat(dist.stats(moments="s"))
+                    except Exception as e:
+                        st.warning(
+                            f"Ошибка при расчете статистик для "
+                            f"{distribution}: {str(e)}"
                         )
+                        mean = "Ошибка"
+                        cv = "Ошибка"
+                        cs = "Ошибка"
 
-                    mean = dist.mean()
-                    std = dist.std()
-                    cv = format_stat(std / mean)
-                    cs = format_stat(dist.stats(moments="s"))
-                except Exception as e:
-                    st.warning(
-                        f"Ошибка при расчете статистик для {distribution}: {str(e)}"
-                    )
-                    mean = "Ошибка"
-                    cv = "Ошибка"
-                    cs = "Ошибка"
-            elif isinstance(selected_dist, KrytskyMenkelAdapter):
-                try:
-                    γ, a, b = params
-                    mean = selected_dist.mean_original(γ, a, b)
-                    cv = format_stat(km_coefficient_of_variation(γ, a, b))
-                    cs = format_stat(km_coefficient_of_skewness(γ, a, b))
-                except Exception as e:
-                    st.warning(
-                        f"Ошибка при расчете статистик для {distribution}: {str(e)}"
-                    )
-                    mean = "Ошибка"
-                    cv = "Ошибка"
-                    cs = "Ошибка"
-            elif (
-                isinstance(selected_dist, CustomDistributionAdapter)
-                and "Гумбеля (Мом)" in distribution
-            ):
-                try:
-                    dist = stats.gumbel_r(loc=params[0], scale=params[1])
-                    mean = dist.mean()
-                    std = dist.std()
-                    cv = format_stat(std / mean)
-                    cs = format_stat(dist.stats(moments="s"))
-                except Exception as e:
-                    st.warning(
-                        f"Ошибка при расчете статистик для {distribution}: {str(e)}"
-                    )
-                    mean = "Ошибка"
-                    cv = "Ошибка"
-                    cs = "Ошибка"
-
-            parameters_df[f"{teor_label}"] = pd.DataFrame(
-                [mean, cv, cs, r2, mae, maxE, ad_stat]
-            )
-
-        ax.xaxis.grid(True)
-        plt.xscale("function", functions=[scalefunc, lambda x: x])
-        ax.set_xlabel("Обеспеченность, %", fontsize=12)
-        ax.set_ylabel(values_col, fontsize=12)
-        ax.set_title("Значения с разной долей обеспеченности", fontsize=14)
-        ax.set(xlim=(0.1, 99.9))
-        plt.xticks([0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9])
-        ax.set_xticklabels(
-            [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
-        )
-        ax.tick_params(axis="x", labelsize=11)
-        ax.tick_params(axis="y", labelsize=11)
-        ax.legend(title="Вид распределения", fontsize=11, title_fontsize=12)
-        st.pyplot(fig, width="content")
-
-        with st.expander(
-            "📋 Расчет значений с разной долей обеспеченности (в %)", expanded=False
-        ):
-            df_1 = df_1.T
-            st.markdown(df_1.to_html(index=True, header=False), unsafe_allow_html=True)
-
-            p = st.number_input(
-                "Выберите обеспеченность для расчета значения (0 < P < 100)",
-                min_value=0.001,
-                max_value=99.999,
-                format="%.3f",
-            )
-            if (
-                "last_logged_p" not in st.session_state
-                or st.session_state.last_logged_p != p
-            ):
-                log_analytics(
-                    uploaded_file=active_file,
-                    distributions_selected=distributions_to_plot,
-                    custom_ensurence_value=p,
+                parameters_df[f"{teor_label}"] = pd.DataFrame(
+                    [mean, cv, cs, r2, mae, maxE, ad_stat]
                 )
-                st.session_state.last_logged_p = p
 
-            custom_dict = {}
-            for distribution in distributions_to_plot:
-                selected_dist = distributions[distribution]
-                params = distribution_params[distribution]
-                teor_label = distribution
-                custom_dict[teor_label] = custom_round(
-                    selected_dist.ppf(1 - p / 100, *params),
-                    min_decimals=precision,
-                )
-            custom_df = pd.DataFrame.from_dict(
-                custom_dict, orient="index", columns=["Values"]
+            ax.xaxis.grid(True)
+            plt.xscale("function", functions=[scalefunc, lambda x: x])
+            ax.set_xlabel("Обеспеченность, %", fontsize=12)
+            ax.set_ylabel(values_col, fontsize=12)
+            ax.set_title("Значения с разной долей обеспеченности", fontsize=14)
+            ax.set(xlim=(0.1, 99.9))
+            plt.xticks(
+                [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
             )
-            st.markdown(
-                custom_df.to_html(index=True, header=False), unsafe_allow_html=True
+            ax.set_xticklabels(
+                [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
             )
+            ax.tick_params(axis="x", labelsize=11)
+            ax.tick_params(axis="y", labelsize=11)
+            ax.legend(title="Вид распределения", fontsize=11, title_fontsize=12)
+            st.pyplot(fig, width="content")
 
-        with st.expander(
-            "📋 Параметры и метрики качества полученных распределений", expanded=False
-        ):
-            parameters_df = parameters_df.set_index("Распределение", drop=True).T
-            st.markdown(
-                style_dataframe_html(parameters_df, data_precision=precision),
-                unsafe_allow_html=True,
-            )
-            if len(parameters_df) >= 2:
+            curve_buf = BytesIO()
+            fig.savefig(curve_buf, format="png", dpi=150, bbox_inches="tight")
+            plt.close(fig)
+            curve_buf.seek(0)
+            results_curve_png = curve_buf.getvalue()
+
+            parameters_df_view = parameters_df.set_index(
+                "Распределение", drop=True
+            ).T
+            parameters_df_view.columns.name = "Распределение"
+            quantiles_df_view = df_1.T.copy()
+
+            with st.expander(
+                "📋 Параметры и метрики качества полученных распределений",
+                expanded=False,
+            ):
                 st.markdown(
-                    """
-                                <b>Примечания к таблице:</b>
-                                <br>
-                                &nbsp;&nbsp;&nbsp;&nbsp;Зелёным цветом показаны значения, ближайшие к эмпирическим, красным - самые удалённые.
-                                """,
+                    style_dataframe_html(
+                        parameters_df_view, data_precision=precision
+                    ),
                     unsafe_allow_html=True,
                 )
-            st.markdown(
-                """
-                            <b>Расшифровка названий столбцов:</b>
-                            <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>Среднее</b> - среднее значение
-                            <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>Cv</b> - коэффициент вариации
-                            <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>Cs</b> - коэффициент асимметрии
-                            <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>R²</b> - коэффициент детерминации (чем ближе к 1, тем лучше модель описывает изменения в наблюдаемых данных)
-                            <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>MAE</b> - средняя абсолютная ошибка (среднее отклонение предсказаний от эмпирических данных)
-                            <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>maxE</b> - максимальная абсолютная ошибка (максимальное отклонение предсказаний от эмпирических данных)
-                            <br>
-                            &nbsp;&nbsp;&nbsp;&nbsp;• <b>A-D</b> - Критерий согласия Андерсона-Дарлинга (чем меньше, тем лучше соответствие распределения данным)
-                            """,
-                unsafe_allow_html=True,
-            )
+                if len(parameters_df_view) >= 2:
+                    st.markdown(
+                        """
+                        <b>Примечания к таблице:</b>
+                        <br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;Зелёным цветом показаны значения,
+                        ближайшие к эмпирическим, красным - самые удалённые.
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                st.markdown(
+                    """
+                    <b>Расшифровка названий столбцов:</b>
+                    <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;• <b>Среднее</b> - среднее значение
+                    <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;• <b>Cv</b> - коэффициент вариации
+                    <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;• <b>Cs</b> - коэффициент асимметрии
+                    <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;• <b>R²</b> - коэффициент детерминации
+                    (чем ближе к 1, тем лучше модель описывает изменения
+                    в наблюдаемых данных)
+                    <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;• <b>MAE</b> - средняя абсолютная ошибка
+                    (среднее отклонение предсказаний от эмпирических данных)
+                    <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;• <b>maxE</b> - максимальная абсолютная
+                    ошибка (максимальное отклонение предсказаний
+                    от эмпирических данных)
+                    <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;• <b>A-D</b> - Критерий согласия
+                    Андерсона-Дарлинга (чем меньше, тем лучше соответствие
+                    распределения данным)
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-    except Exception as e:
-        st.error(f"Ошибка: {str(e)}")
+            with st.expander(
+                "📋 Расчет значений с разной долей обеспеченности (в %)",
+                expanded=False,
+            ):
+                st.markdown(
+                    quantiles_df_view.to_html(index=True, header=False),
+                    unsafe_allow_html=True,
+                )
+
+                p = st.number_input(
+                    "Выберите обеспеченность для расчета значения (0 < P < 100)",
+                    min_value=0.001,
+                    max_value=99.999,
+                    value=20.0,
+                    format="%.3f",
+                )
+                if (
+                    "last_logged_p" not in st.session_state
+                    or st.session_state.last_logged_p != p
+                ):
+                    log_analytics(
+                        uploaded_file=active_file,
+                        distributions_selected=distributions_to_plot,
+                        custom_ensurence_value=p,
+                    )
+                    st.session_state.last_logged_p = p
+
+                custom_df = None
+                if distributions_to_plot:
+                    custom_dict = {}
+                    for distribution in distributions_to_plot:
+                        selected_dist = distributions[distribution]
+                        params = distribution_params[distribution]
+                        teor_label = distribution
+                        custom_dict[teor_label] = custom_round(
+                            selected_dist.ppf(1 - p / 100, *params),
+                            min_decimals=precision,
+                        )
+                    custom_df = pd.DataFrame.from_dict(
+                        custom_dict, orient="index", columns=["Values"]
+                    )
+
+                col_add_tbl, col_add_btn, _ = st.columns([1.4, 1, 3.5])
+                with col_add_tbl:
+                    if custom_df is not None:
+                        st.markdown(
+                            custom_df.to_html(index=True, header=False),
+                            unsafe_allow_html=True,
+                        )
+                with col_add_btn:
+                    if st.button(
+                        "Добавить в таблицу",
+                        use_container_width=True,
+                    ):
+                        if not distributions_to_plot:
+                            st.warning(
+                                "Сначала выберите хотя бы одно распределение."
+                            )
+                        elif any(
+                            abs(float(p) - float(e)) < 1e-9 for e in all_percents
+                        ):
+                            st.info(
+                                "Это значение обеспеченности уже есть в таблице."
+                            )
+                        else:
+                            st.session_state.added_ensurance_values = added_p + [
+                                float(p)
+                            ]
+                            st.rerun()
+
+            results_parameters_df = parameters_df_view
+            results_quantiles_df = quantiles_df_view
+            process_ok = True
+        except Exception as e:
+            st.error(f"Ошибка: {str(e)}")
+
+with tab_results:
+    if not prep_ok:
+        st.info(
+            "Сначала подготовьте данные во вкладке «Подготовка данных»."
+        )
+    else:
+        try:
+            with st.expander(
+                "🔢 Хронологический ряд значений и эмпирическое распределение",
+                expanded=False,
+            ):
+                if index_col != "Без группировки":
+                    st.markdown(
+                        data_empirical[
+                            [
+                                index_col,
+                                values_col,
+                                "Обеспеченность P, %",
+                                values_col + " (P)",
+                                index_col + " (P)",
+                            ]
+                        ].to_html(),
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        data_empirical[
+                            [
+                                values_col,
+                                "Обеспеченность P, %",
+                                values_col + " (P)",
+                            ]
+                        ].to_html(),
+                        unsafe_allow_html=True,
+                    )
+
+            with st.expander("📊 График хода значений", expanded=False):
+                fig, ax = plt.subplots(figsize=(12, 6))
+                x = (
+                    series_df[index_col]
+                    if index_col != "Без группировки"
+                    else series_df.index
+                )
+                y = series_df[values_col]
+                plt.plot(x, y, linewidth=1.5)
+                ax.set_ylabel(values_col, fontsize=12)
+                ax.set_title("График хода значений", fontsize=14)
+                ax.tick_params(axis="x", labelsize=11)
+                ax.tick_params(axis="y", labelsize=11)
+                if index_col != "Без группировки":
+                    ax.set_xlabel(index_col, fontsize=12)
+                st.pyplot(fig, width="content")
+                plt.close(fig)
+
+            if process_ok and results_curve_png is not None:
+                with st.expander(
+                    "📉 Кривые обеспеченности",
+                    expanded=False,
+                ):
+                    st.image(results_curve_png, use_container_width=True)
+
+            if process_ok and results_parameters_df is not None:
+                with st.expander(
+                    "📋 Параметры и метрики качества полученных распределений",
+                    expanded=False,
+                ):
+                    st.markdown(
+                        style_dataframe_html(
+                            results_parameters_df, data_precision=precision
+                        ),
+                        unsafe_allow_html=True,
+                    )
+
+            if process_ok and results_quantiles_df is not None:
+                with st.expander(
+                    "📋 Расчет значений с разной долей обеспеченности (в %)",
+                    expanded=False,
+                ):
+                    st.markdown(
+                        results_quantiles_df.to_html(index=True, header=False),
+                        unsafe_allow_html=True,
+                    )
+
+            docx_bytes = build_results_docx(
+                series_df=series_df,
+                data=data_empirical,
+                values_col=values_col,
+                index_col=index_col,
+                curve_png=results_curve_png,
+                parameters_df=results_parameters_df,
+                quantiles_df=results_quantiles_df,
+                data_precision=precision,
+            )
+            st.download_button(
+                "Скачать результаты одним файлом",
+                data=docx_bytes,
+                file_name="результаты_кривые_обеспеченности.docx",
+                mime=(
+                    "application/vnd.openxmlformats-officedocument"
+                    ".wordprocessingml.document"
+                ),
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.error(f"Ошибка: {str(e)}")
