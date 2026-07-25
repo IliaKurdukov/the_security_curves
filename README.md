@@ -17,19 +17,6 @@
 Приложение развернуто в Streamlit Cloud:
 🔗 [https://thesecuritycurves.streamlit.app/](https://thesecuritycurves-mk8pbyd72a3xukqdmtw4vb.streamlit.app/)
 
-📂 **Структура проекта**
-
-the_security_curves/  
-├── .github/workflows/  # Автоматизация GitHub Actions (обновление аналитики)  
-├── scripts/  # Вспомогательные скрипты  
-│   └── update_analytics.py  # Скрипт для генерации графиков и обновления README  
-├── graphs/  # Папка с генерируемыми графиками аналитики  
-├── hidrodata.py  # Главный скрипт приложения Streamlit  
-├── analytics.csv  # Логи использования приложения  
-├── requirements.txt  # Зависимости Python  
-├── LICENSE  # Лицензия  
-└── README.md  # Этот файл  
-
 📊 **Аналитика использования приложения**
 
 Данные собираются и анализируются для оценки пользы приложения, а также определения дальнейшего пути развития.
