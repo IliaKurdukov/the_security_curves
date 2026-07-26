@@ -32,6 +32,56 @@ CSV_SEPARATOR = ";"
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GRAPHS_DIR = Path("graphs")
 
+# Подписи графиков аналитики (ru / en)
+ANALYTICS_LABELS = {
+    "ru": {
+        "daily_title": "Динамика количества использований по дням",
+        "daily_regular": "Обычные загрузки",
+        "daily_sample": "Тестовый файл",
+        "dist_title": "Самые распространенные распределения (кол-во использований)",
+        "cloud_title": 'Самые частые названия файлов (кроме "Книга1" и "Лист Microsoft Excel")',
+        "no_data": "*Нет данных для отображения*",
+        "alt_daily": "Динамика использований",
+        "alt_dist": "Популярные распределения",
+        "alt_cloud": "Облако названий файлов",
+        "date_fmt": "%d.%m",
+    },
+    "en": {
+        "daily_title": "Daily usage over time",
+        "daily_regular": "Regular uploads",
+        "daily_sample": "Sample file",
+        "dist_title": "Most used distributions (usage count)",
+        "cloud_title": 'Most frequent upload filenames (excluding junk like "Book1")',
+        "no_data": "*No data to display*",
+        "alt_daily": "Daily usage",
+        "alt_dist": "Popular distributions",
+        "alt_cloud": "Filename word cloud",
+        "date_fmt": "en_day_mon",
+    },
+}
+
+
+def _graph_filename(stem: str, lang: str) -> Path:
+    """ru → stem.png, en → stem_en.png"""
+    suffix = "" if lang == "ru" else f"_{lang}"
+    return GRAPHS_DIR / f"{stem}{suffix}.png"
+
+
+def _dist_label(name: str, lang: str) -> str:
+    """Локализованное имя распределения для графика."""
+    try:
+        import sys
+
+        root = Path(__file__).resolve().parent.parent
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from i18n import TRANSLATIONS
+
+        key = f"dist.{name}"
+        return TRANSLATIONS.get(lang, {}).get(key) or TRANSLATIONS["ru"].get(key, name)
+    except Exception:
+        return name
+
 # Должно совпадать с SAMPLE_FILE_NAMES в analytics.py
 SAMPLE_FILE_NAMES = ["tsc_sample__daily_precip.xlsx"]
 # Старое имя примера и файлы, полностью исключаемые из облака
@@ -272,7 +322,7 @@ def _blue_color_func(word, font_size, position, orientation, random_state=None, 
 
 
 def create_filename_wordcloud(df):
-    """Облако слов по именам загружаемых файлов (без тестовых/мусорных)."""
+    """Облако слов по именам файлов — RU и EN (различаются подписи)."""
     try:
         from wordcloud import WordCloud
     except ImportError:
@@ -284,19 +334,16 @@ def create_filename_wordcloud(df):
     token_counts = Counter()
     for name in df["file_name"].dropna():
         for token in extract_filename_tokens(name):
-            # единый ключ без регистра, отображение — самый частый вариант написания
             token_counts[token] += 1
 
     if not token_counts:
         return False
 
-    # Схлопнуть регистровые дубликаты: Уровни / уровни
     folded = {}
     display = {}
     for token, count in token_counts.items():
         key = token.casefold()
         folded[key] = folded.get(key, 0) + count
-        # предпочитаем вариант с заглавной, если есть
         prev = display.get(key)
         if prev is None or (token[:1].isupper() and not prev[:1].isupper()):
             display[key] = token
@@ -306,38 +353,39 @@ def create_filename_wordcloud(df):
         return False
 
     font_path = _cyrillic_font_path()
-    wc = WordCloud(
-        width=800,
-        height=400,
-        background_color="white",
-        prefer_horizontal=0.9,
-        max_words=80,
-        relative_scaling=0.45,
-        collocations=False,
-        font_path=font_path,
-        color_func=_blue_color_func,
-        min_font_size=10,
-    )
-    wc.generate_from_frequencies(frequencies)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.imshow(wc, interpolation="bilinear")
-    ax.axis("off")
-    ax.set_title(
-        'Самые частые названия файлов (кроме "Книга1" и "Лист Microsoft Excel")'
-    )
-    plt.tight_layout()
-
     GRAPHS_DIR.mkdir(exist_ok=True)
-    plt.savefig(
-        GRAPHS_DIR / "filename_wordcloud.png",
-        dpi=100,
-        bbox_inches="tight",
-        facecolor="white",
-        edgecolor="none",
-    )
-    plt.close()
-    return True
+    ok = False
+    for lang in ("ru", "en"):
+        labels = ANALYTICS_LABELS[lang]
+        wc = WordCloud(
+            width=800,
+            height=400,
+            background_color="white",
+            prefer_horizontal=0.9,
+            max_words=80,
+            relative_scaling=0.45,
+            collocations=False,
+            font_path=font_path,
+            color_func=_blue_color_func,
+            min_font_size=10,
+        )
+        wc.generate_from_frequencies(frequencies)
+
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.imshow(wc, interpolation="bilinear")
+        ax.axis("off")
+        ax.set_title(labels["cloud_title"])
+        plt.tight_layout()
+        plt.savefig(
+            _graph_filename("filename_wordcloud", lang),
+            dpi=100,
+            bbox_inches="tight",
+            facecolor="white",
+            edgecolor="none",
+        )
+        plt.close()
+        ok = True
+    return ok
 
 
 def get_analytics_csv():
@@ -369,7 +417,7 @@ def parse_distributions_list(dist_str):
     return [item for item in items if item]
 
 def create_daily_activity_graph(df):
-    """Создает график активности по дням (обычные загрузки + тестовый файл)."""
+    """График активности по дням — RU и EN версии."""
     df = df.copy()
     df["datetime"] = pd.to_datetime(df["date"])
 
@@ -385,9 +433,7 @@ def create_daily_activity_graph(df):
         if frame.empty:
             daily = pd.DataFrame(columns=["date", "count"])
         else:
-            daily = (
-                frame.groupby("date").size().reset_index(name="count")
-            )
+            daily = frame.groupby("date").size().reset_index(name="count")
             daily["date"] = pd.to_datetime(daily["date"])
         full_dates = pd.DataFrame({"date": date_range})
         merged = pd.merge(full_dates, daily, on="date", how="left").fillna(0)
@@ -395,81 +441,92 @@ def create_daily_activity_graph(df):
 
     regular_counts = counts_by_date(recent[~recent["_is_sample"]])
     sample_counts = counts_by_date(recent[recent["_is_sample"]])
-
-    dates_display = [d.strftime("%d.%m") for d in regular_counts["date"]]
-    x = np.arange(len(dates_display))
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_visible(False)
-    ax.yaxis.set_visible(False)
-
-    ax.plot(
-        x,
-        regular_counts["count"],
-        marker="o",
-        markersize=4,
-        color="#3572a5",
-        label="Обычные загрузки",
-    )
-    ax.plot(
-        x,
-        sample_counts["count"],
-        marker="o",
-        markersize=4,
-        color="#e67e22",
-        label="Тестовый файл",
-    )
-
-    ax.set_title("Динамика количества использований по дням")
-    ax.set_xticks(x)
-    ax.set_xticklabels(dates_display, rotation=45, ha="right")
-    ax.legend(frameon=False, loc="upper left")
-
+    x = np.arange(len(regular_counts["date"]))
     y_max = max(
         regular_counts["count"].max(),
         sample_counts["count"].max(),
         5,
     )
-    ax.set_ylim(bottom=0, top=y_max * 1.15)
 
-    for i, v in enumerate(regular_counts["count"]):
-        if v > 0:
-            ax.text(
-                i,
-                v + (y_max * 0.05),
-                str(int(v)),
-                ha="center",
-                fontsize=9,
-                color="#3572a5",
-            )
-    for i, v in enumerate(sample_counts["count"]):
-        if v > 0:
-            ax.text(
-                i,
-                v + (y_max * 0.12),
-                str(int(v)),
-                ha="center",
-                fontsize=9,
-                color="#e67e22",
-            )
-
-    plt.tight_layout()
     GRAPHS_DIR.mkdir(exist_ok=True)
-    plt.savefig(
-        GRAPHS_DIR / "daily_activity.png",
-        dpi=100,
-        bbox_inches="tight",
-        facecolor="white",
-        edgecolor="none",
-    )
-    plt.close()
+    for lang in ("ru", "en"):
+        labels = ANALYTICS_LABELS[lang]
+        if labels["date_fmt"] == "en_day_mon":
+            _en_mon = (
+                "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
+            )
+            dates_display = [
+                f"{d.day} {_en_mon[d.month - 1]}" for d in regular_counts["date"]
+            ]
+        else:
+            dates_display = [
+                d.strftime(labels["date_fmt"]) for d in regular_counts["date"]
+            ]
+
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.yaxis.set_visible(False)
+
+        ax.plot(
+            x,
+            regular_counts["count"],
+            marker="o",
+            markersize=4,
+            color="#3572a5",
+            label=labels["daily_regular"],
+        )
+        ax.plot(
+            x,
+            sample_counts["count"],
+            marker="o",
+            markersize=4,
+            color="#e67e22",
+            label=labels["daily_sample"],
+        )
+
+        ax.set_title(labels["daily_title"])
+        ax.set_xticks(x)
+        ax.set_xticklabels(dates_display, rotation=45, ha="right")
+        ax.legend(frameon=False, loc="upper left")
+        ax.set_ylim(bottom=0, top=y_max * 1.15)
+
+        for i, v in enumerate(regular_counts["count"]):
+            if v > 0:
+                ax.text(
+                    i,
+                    v + (y_max * 0.05),
+                    str(int(v)),
+                    ha="center",
+                    fontsize=9,
+                    color="#3572a5",
+                )
+        for i, v in enumerate(sample_counts["count"]):
+            if v > 0:
+                ax.text(
+                    i,
+                    v + (y_max * 0.12),
+                    str(int(v)),
+                    ha="center",
+                    fontsize=9,
+                    color="#e67e22",
+                )
+
+        plt.tight_layout()
+        plt.savefig(
+            _graph_filename("daily_activity", lang),
+            dpi=100,
+            bbox_inches="tight",
+            facecolor="white",
+            edgecolor="none",
+        )
+        plt.close()
     return True
 
 
 def create_distributions_graph(df):
-    """Создает график популярности распределений (без тестового файла)."""
+    """Популярность распределений — RU и EN (подписи распределений локализованы)."""
     df = df.copy()
     df = df[~df["file_name"].apply(is_sample_file)]
 
@@ -483,124 +540,117 @@ def create_distributions_graph(df):
 
     dist_counts = Counter(all_distributions)
     top_dist = pd.Series(dist_counts).sort_values(ascending=True)
-
     if top_dist.empty:
         return False
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-
-    # Убираем границы
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-
-    # Убираем ось X
-    ax.xaxis.set_visible(False)
-
-    # Создаем горизонтальный bar plot
-    y_pos = np.arange(len(top_dist))
-    bars = ax.barh(y_pos, top_dist.values, 
-                   color='#3572a5',
-                   height=0.6)
-
-    # Настройка внешнего вида
-    ax.set_title('Самые распространенные распределения (кол-во использований)', x=0.35)
-
-    # Устанавливаем подписи на оси Y
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(top_dist.index)
-    
-    # Убираем черточки (ticks) на оси Y
-    ax.tick_params(axis='y', length=0)
-
-    # Добавляем значения в концы столбцов
-    for i, (bar, value) in enumerate(zip(bars, top_dist.values)):
-        width = bar.get_width()
-        ax.text(width + (max(top_dist.values) * 0.01), 
-                bar.get_y() + bar.get_height()/2,
-                str(value),
-                va='center')
-
-    # Автонастройка пределов оси X
-    ax.set_xlim(left=0, right=max(top_dist.values) * 1.1)
-
-    plt.tight_layout()
-
-    # Сохраняем график
     GRAPHS_DIR.mkdir(exist_ok=True)
-    plt.savefig(GRAPHS_DIR / 'distributions.png', 
-                dpi=100, 
-                bbox_inches='tight',
-                facecolor='white',
-                edgecolor='none')
-    plt.close()
-    
+    for lang in ("ru", "en"):
+        labels = ANALYTICS_LABELS[lang]
+        y_labels = [_dist_label(str(name), lang) for name in top_dist.index]
+
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.xaxis.set_visible(False)
+
+        y_pos = np.arange(len(top_dist))
+        bars = ax.barh(y_pos, top_dist.values, color="#3572a5", height=0.6)
+        ax.set_title(labels["dist_title"], x=0.35)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(y_labels)
+        ax.tick_params(axis="y", length=0)
+
+        for bar, value in zip(bars, top_dist.values):
+            width = bar.get_width()
+            ax.text(
+                width + (max(top_dist.values) * 0.01),
+                bar.get_y() + bar.get_height() / 2,
+                str(value),
+                va="center",
+            )
+
+        ax.set_xlim(left=0, right=max(top_dist.values) * 1.1)
+        plt.tight_layout()
+        plt.savefig(
+            _graph_filename("distributions", lang),
+            dpi=100,
+            bbox_inches="tight",
+            facecolor="white",
+            edgecolor="none",
+        )
+        plt.close()
     return True
 
 
+def _analytics_markdown_block(lang: str, daily_ok, dist_ok, cloud_ok) -> str:
+    """Фрагмент README для одного языка."""
+    labels = ANALYTICS_LABELS[lang]
+    if lang == "ru":
+        start, end = "<!-- START_ANALYTICS -->", "<!-- END_ANALYTICS -->"
+    else:
+        start, end = "<!-- START_ANALYTICS_EN -->", "<!-- END_ANALYTICS_EN -->"
+
+    parts = [start, ""]
+    if daily_ok:
+        path = _graph_filename("daily_activity", lang).as_posix()
+        parts.append(f"![{labels['alt_daily']}]({path})")
+        parts.append("")
+    if dist_ok:
+        path = _graph_filename("distributions", lang).as_posix()
+        parts.append(f"![{labels['alt_dist']}]({path})")
+        parts.append("")
+    if cloud_ok:
+        path = _graph_filename("filename_wordcloud", lang).as_posix()
+        parts.append(f"![{labels['alt_cloud']}]({path})")
+        parts.append("")
+    if not daily_ok and not dist_ok and not cloud_ok:
+        parts.append(labels["no_data"])
+        parts.append("")
+    parts.append(end)
+    return "\n".join(parts)
+
+
 def update_readme_with_analytics():
-    """Обновляет README.md с новой аналитикой"""
+    """Обновляет README.md: графики RU/EN и обе секции аналитики."""
     csv_content = get_analytics_csv()
-    
+
     if not csv_content:
         return
-    
-    lines = csv_content.split('\n')
+
+    lines = csv_content.split("\n")
     if len(lines) < 2:
         return
-    
+
     df = pd.read_csv(pd.io.common.StringIO(csv_content), sep=CSV_SEPARATOR)
-    
-    # Создаем графики
+
     daily_created = create_daily_activity_graph(df)
     dist_created = create_distributions_graph(df)
     cloud_created = create_filename_wordcloud(df)
-    
-    # Формируем секцию аналитики
-    today = datetime.now().strftime("%d.%m.%Y %H:%M")
-    
-    analytics_section = f"""<!-- START_ANALYTICS -->
 
-"""
-    
-    if daily_created:
-        analytics_section += """
-![Динамика использований](graphs/daily_activity.png)
-
-"""
-    
-    if dist_created:
-        analytics_section += """
-![Популярные распределения](graphs/distributions.png)
-
-"""
-
-    if cloud_created:
-        analytics_section += """
-![Облако названий файлов](graphs/filename_wordcloud.png)
-
-"""
-    
-    if not daily_created and not dist_created and not cloud_created:
-        analytics_section += "*Нет данных для отображения*\n\n"
-    
-    analytics_section += "<!-- END_ANALYTICS -->"
-    
-    # Читаем и обновляем README
-    with open('README.md', 'r', encoding='utf-8') as f:
+    with open("README.md", "r", encoding="utf-8") as f:
         readme_content = f.read()
-    
-    pattern = r'<!-- START_ANALYTICS -->[\s\S]*?<!-- END_ANALYTICS -->'
-    if re.search(pattern, readme_content):
-        new_content = re.sub(pattern, analytics_section, readme_content, flags=re.MULTILINE)
-    else:
-        new_content = readme_content.rstrip() + '\n\n' + analytics_section
-    
-    with open('README.md', 'w', encoding='utf-8') as f:
-        f.write(new_content)
-    
-    # Коммитим изменения
+
+    for lang in ("ru", "en"):
+        block = _analytics_markdown_block(
+            lang, daily_created, dist_created, cloud_created
+        )
+        if lang == "ru":
+            pattern = r"<!-- START_ANALYTICS -->[\s\S]*?<!-- END_ANALYTICS -->"
+        else:
+            pattern = r"<!-- START_ANALYTICS_EN -->[\s\S]*?<!-- END_ANALYTICS_EN -->"
+
+        if re.search(pattern, readme_content):
+            readme_content = re.sub(
+                pattern, block, readme_content, count=1, flags=re.MULTILINE
+            )
+        elif lang == "ru":
+            readme_content = readme_content.rstrip() + "\n\n" + block + "\n"
+
+    with open("README.md", "w", encoding="utf-8") as f:
+        f.write(readme_content)
+
     commit_changes()
 
 def commit_changes():
