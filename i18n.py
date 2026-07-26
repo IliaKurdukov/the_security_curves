@@ -174,7 +174,7 @@ TRANSLATIONS = {
         "lang_ru": "Русский",
         "lang_en": "English",
         "sidebar_about": """### ℹ️ About the project
-The app automatically builds exceedance (security) curves from raw data.
+The app automatically builds exceedance curves from raw data.
 
 Ask questions, share ideas, and follow hydrometeorology updates in [our channel](https://t.me/+g8Kjj2t8hvsxYmJi).
 

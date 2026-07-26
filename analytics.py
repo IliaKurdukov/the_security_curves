@@ -17,8 +17,11 @@ ANALYTICS_PATH = "analytics.csv"
 # Полностью не пишем в analytics.csv
 EXCLUDED_FROM_ANALYTICS = ["тест.xlsx"]
 
-# Пишем в CSV, но на графиках учитываем отдельно (кнопка «тестовый файл»)
+# Пишем в CSV, но на графиках учитываем отдельно (кнопка «Загрузить тестовый файл»)
 SAMPLE_FILE_NAMES = ["tsc_sample__daily_precip.xlsx"]
+
+# Визиты на заглушку старого Streamlit URL (hidrodata.py)
+OLD_URL_STUB_NAME = "__old_url_stub__"
 
 
 def get_session_id():
@@ -99,6 +102,13 @@ def is_sample_file(filename):
     return any(item.lower() == name for item in SAMPLE_FILE_NAMES)
 
 
+def is_old_url_stub(filename):
+    """Заход через старый URL (заглушка hidrodata.py)."""
+    if not filename:
+        return False
+    return Path(str(filename)).name == OLD_URL_STUB_NAME
+
+
 def is_test_file(filename):
     """Обратная совместимость: исключённые + пример."""
     return is_excluded_from_analytics(filename) or is_sample_file(filename)
@@ -120,6 +130,64 @@ def parse_list_from_csv(csv_string):
         return [item.strip().replace('""', '"') for item in items if item.strip()]
     except Exception:
         return []
+
+
+def log_stub_visit():
+    """Один раз за сессию: визит на заглушку старого URL → analytics.csv."""
+    try:
+        if st.session_state.get("_stub_visit_logged"):
+            return False
+
+        token = get_github_token()
+        if not token:
+            return False
+
+        session_id = get_session_id()
+        sha, content = get_csv_from_github(token)
+        if sha is None:
+            return False
+
+        lines = content.split("\n")
+        if not lines or len(lines) < 2:
+            headers = (
+                f"date{CSV_SEPARATOR}time{CSV_SEPARATOR}session_id{CSV_SEPARATOR}"
+                f"file_name{CSV_SEPARATOR}file_size{CSV_SEPARATOR}file_rows{CSV_SEPARATOR}"
+                f"distributions_selected{CSV_SEPARATOR}distributions_count{CSV_SEPARATOR}"
+                f"custom_ensurence_value"
+            )
+            lines = [headers, ""]
+
+        for i in range(1, len(lines)):
+            if lines[i].strip() and session_id in lines[i]:
+                st.session_state["_stub_visit_logged"] = True
+                return False
+
+        now = datetime.now()
+        new_line = CSV_SEPARATOR.join(
+            [
+                date.today().isoformat(),
+                now.strftime("%H:%M:%S"),
+                session_id,
+                OLD_URL_STUB_NAME,
+                "0",
+                "None",
+                "[]",
+                "0",
+                "[]",
+            ]
+        )
+        if lines[-1] == "":
+            lines[-1] = new_line
+        else:
+            lines.append(new_line)
+        lines.append("")
+
+        ok = save_to_github(token, sha, "\n".join(lines))
+        if ok:
+            st.session_state["_stub_visit_logged"] = True
+        return ok
+    except Exception:
+        return False
 
 
 def log_analytics(uploaded_file=None, distributions_selected=None, custom_ensurence_value=None):

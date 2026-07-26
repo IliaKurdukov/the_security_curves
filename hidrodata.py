@@ -1,20 +1,25 @@
 """
 Заглушка для старого URL Streamlit Cloud.
-Главное приложение: app.py → https://thesecuritycurves.streamlit.app/
+Главное приложение: app.py → https://exceedance-curves.streamlit.app/
 """
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-NEW_URL = "https://thesecuritycurves.streamlit.app/"
+from analytics import log_stub_visit
+
+NEW_URL = "https://exceedance-curves.streamlit.app/"
 
 st.set_page_config(
-    page_title="The Security Curves — moved",
+    page_title="Exceedance curves — moved",
     page_icon="📉",
     layout="centered",
 )
 
-st.title("📉 The Security Curves")
+# Учёт захода по старой ссылке (тот же analytics.csv, маркер __old_url_stub__)
+log_stub_visit()
+
+st.title("📉 Exceedance curves")
 st.subheader("Приложение переехало / The app has moved")
 
 st.markdown(

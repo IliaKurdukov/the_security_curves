@@ -1,4 +1,4 @@
-# The Security Curves
+# Exceedance Curves
 
 📉 Кривые обеспеченности / Exceedance curves
 
@@ -28,7 +28,7 @@ Streamlit-приложение для подбора теоретических 
 ### Онлайн-доступ
 
 Приложение на Streamlit Cloud:  
-🔗 [https://thesecuritycurves.streamlit.app/](https://thesecuritycurves.streamlit.app/)
+🔗 [https://exceedance-curves.streamlit.app/](https://exceedance-curves.streamlit.app/)
 
 ### Аналитика использования
 
@@ -57,7 +57,7 @@ Streamlit-приложение для подбора теоретических 
 
 ### About
 
-A Streamlit app for fitting theoretical distributions to hydrometeorological series and building exceedance (security) curves.
+A Streamlit app for fitting theoretical distributions to hydrometeorological series and building exceedance curves.
 
 Workflow: upload → prepare → process → results. A sample Excel file is available in the app.
 
@@ -75,7 +75,7 @@ Workflow: upload → prepare → process → results. A sample Excel file is ava
 ### Online access
 
 Live on Streamlit Cloud:  
-🔗 [https://thesecuritycurves.streamlit.app/](https://thesecuritycurves.streamlit.app/)
+🔗 [https://exceedance-curves.streamlit.app/](https://exceedance-curves.streamlit.app/)
 
 ### Usage analytics
 

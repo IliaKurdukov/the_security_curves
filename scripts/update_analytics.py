@@ -38,6 +38,7 @@ ANALYTICS_LABELS = {
         "daily_title": "Динамика количества использований по дням",
         "daily_regular": "Обычные загрузки",
         "daily_sample": "Тестовый файл",
+        "daily_old_url": "Старый URL (заглушка)",
         "dist_title": "Самые распространенные распределения (кол-во использований)",
         "cloud_title": 'Самые частые названия файлов (кроме "Книга1" и "Лист Microsoft Excel")',
         "no_data": "*Нет данных для отображения*",
@@ -50,6 +51,7 @@ ANALYTICS_LABELS = {
         "daily_title": "Daily usage over time",
         "daily_regular": "Regular uploads",
         "daily_sample": "Sample file",
+        "daily_old_url": "Old URL (stub)",
         "dist_title": "Most used distributions (usage count)",
         "cloud_title": 'Most frequent upload filenames (excluding junk like "Book1")',
         "no_data": "*No data to display*",
@@ -82,8 +84,9 @@ def _dist_label(name: str, lang: str) -> str:
     except Exception:
         return name
 
-# Должно совпадать с SAMPLE_FILE_NAMES в analytics.py
+# Должно совпадать с analytics.py
 SAMPLE_FILE_NAMES = ["tsc_sample__daily_precip.xlsx"]
+OLD_URL_STUB_NAME = "__old_url_stub__"
 # Старое имя примера и файлы, полностью исключаемые из облака
 EXCLUDED_WORDCLOUD_FILES = {
     "тест.xlsx",
@@ -209,6 +212,13 @@ def is_sample_file(filename):
     return any(item.lower() == name for item in SAMPLE_FILE_NAMES)
 
 
+def is_old_url_stub(filename):
+    """Визит на заглушку старого Streamlit URL."""
+    if filename is None or (isinstance(filename, float) and pd.isna(filename)):
+        return False
+    return Path(str(filename)).name == OLD_URL_STUB_NAME
+
+
 def _cyrillic_font_path():
     """Шрифт с кириллицей: DejaVu из matplotlib или системный."""
     import matplotlib as mpl
@@ -285,6 +295,8 @@ def extract_filename_tokens(filename):
         return []
     if is_sample_file(name):
         return []
+    if is_old_url_stub(name):
+        return []
 
     stem = Path(name).stem
     stem = re.sub(r"\s*[—–-]\s*копия\s*$", "", stem, flags=re.IGNORECASE)
@@ -330,6 +342,7 @@ def create_filename_wordcloud(df):
 
     df = df.copy()
     df = df[~df["file_name"].apply(is_sample_file)]
+    df = df[~df["file_name"].apply(is_old_url_stub)]
 
     token_counts = Counter()
     for name in df["file_name"].dropna():
@@ -428,6 +441,7 @@ def create_daily_activity_graph(df):
 
     recent = df[df["datetime"] >= cutoff_date_dt].copy()
     recent["_is_sample"] = recent["file_name"].apply(is_sample_file)
+    recent["_is_stub"] = recent["file_name"].apply(is_old_url_stub)
 
     def counts_by_date(frame):
         if frame.empty:
@@ -439,12 +453,16 @@ def create_daily_activity_graph(df):
         merged = pd.merge(full_dates, daily, on="date", how="left").fillna(0)
         return merged.sort_values("date")
 
-    regular_counts = counts_by_date(recent[~recent["_is_sample"]])
+    regular_counts = counts_by_date(
+        recent[~recent["_is_sample"] & ~recent["_is_stub"]]
+    )
     sample_counts = counts_by_date(recent[recent["_is_sample"]])
+    stub_counts = counts_by_date(recent[recent["_is_stub"]])
     x = np.arange(len(regular_counts["date"]))
     y_max = max(
         regular_counts["count"].max(),
         sample_counts["count"].max(),
+        stub_counts["count"].max(),
         5,
     )
 
@@ -485,6 +503,14 @@ def create_daily_activity_graph(df):
             color="#e67e22",
             label=labels["daily_sample"],
         )
+        ax.plot(
+            x,
+            stub_counts["count"],
+            marker="o",
+            markersize=4,
+            color="#2ca02c",
+            label=labels["daily_old_url"],
+        )
 
         ax.set_title(labels["daily_title"])
         ax.set_xticks(x)
@@ -512,6 +538,16 @@ def create_daily_activity_graph(df):
                     fontsize=9,
                     color="#e67e22",
                 )
+        for i, v in enumerate(stub_counts["count"]):
+            if v > 0:
+                ax.text(
+                    i,
+                    v + (y_max * 0.19),
+                    str(int(v)),
+                    ha="center",
+                    fontsize=9,
+                    color="#2ca02c",
+                )
 
         plt.tight_layout()
         plt.savefig(
@@ -529,6 +565,7 @@ def create_distributions_graph(df):
     """Популярность распределений — RU и EN (подписи распределений локализованы)."""
     df = df.copy()
     df = df[~df["file_name"].apply(is_sample_file)]
+    df = df[~df["file_name"].apply(is_old_url_stub)]
 
     all_distributions = []
     for dist_str in df["distributions_selected"].dropna():
