@@ -1,6 +1,6 @@
 # The Security Curves
 
-📉 Кривые обеспеченности / Exceedance (security) curves
+📉 Кривые обеспеченности / Exceedance curves
 
 **[Русский](#-русский)** · **[English](#-english)**
 
@@ -16,14 +16,14 @@ Streamlit-приложение для подбора теоретических 
 
 ### Основные функции
 
-- Загрузка Excel и просмотр данных (есть тестовый файл)
+- **Загрузка Excel** и просмотр данных (есть тестовый файл)
 - Подготовка ряда: группировка, агрегация, исключение точек, график хода значений
-- Режимы кривых: **обычная**, **усечённая**, **составная**
-- Подбор распределений: Гумбель, Пирсон III, GEV, Крицкого–Менкеля (ММП / моменты / L-моменты)
-- График обеспеченности со шкалой **периода повторяемости** (годы)
+- Режимы кривых: обычная, усечённая, составная
+- **Подбор распределений**: Гумбель, Пирсон III, GEV, Крицкого–Менкеля (ММП / моменты / L-моменты)
+- График обеспеченности со шкалой периода повторяемости (годы)
 - Таблицы квантилей и метрик качества (среднее, Cv, Cs, R², MAE, maxE, A–D); связанный ввод обеспеченности и периода повторяемости
-- Интерфейс **RU / EN**
-- Выгрузка результатов в **Word**
+- Интерфейс RU / EN
+- **Выгрузка результатов в Word**
 
 ### Онлайн-доступ
 
@@ -59,18 +59,18 @@ Streamlit-приложение для подбора теоретических 
 
 A Streamlit app for fitting theoretical distributions to hydrometeorological series and building exceedance (security) curves.
 
-Workflow: **upload → prepare → process → results**. A sample Excel file is available in the app.
+Workflow: upload → prepare → process → results. A sample Excel file is available in the app.
 
 ### Main features
 
-- Excel upload and data preview (sample file included)
+- **Excel upload** and data preview (sample file included)
 - Series preparation: grouping, aggregation, point exclusion, time-series chart
-- Curve modes: **ordinary**, **truncated**, and **compound**
-- Distributions: Gumbel, Pearson type III, GEV, Krytsky–Menkel (MLE / moments / L-moments)
-- Exceedance plot with a **return period** axis (years)
+- Curve modes: ordinary, truncated, and compound
+- **Distributions fitting**: Gumbel, Pearson type III, GEV, Krytsky–Menkel (MLE / moments / L-moments)
+- Exceedance plot with a return period axis (years)
 - Quantile and goodness-of-fit tables (mean, Cv, Cs, R², MAE, maxE, A–D); linked exceedance ↔ return-period inputs
-- **RU / EN** UI
-- Export results to a **Word** document
+- RU / EN UI
+- **Export results to a Word** document
 
 ### Online access
 
