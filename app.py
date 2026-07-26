@@ -14,9 +14,11 @@ import streamlit as st
 from sklearn.metrics import mean_absolute_error, max_error, r2_score
 
 import i18n as i18n_mod
+import curve_analysis as curve_analysis_mod
 
-# Streamlit на Windows часто не перечитывает соседние модули — форсируем словарь UI
+# Streamlit на Windows часто не перечитывает соседние модули
 i18n_mod = importlib.reload(i18n_mod)
+curve_analysis_mod = importlib.reload(curve_analysis_mod)
 
 from analytics import log_analytics, update_analytics_file_rows
 from distributions import (
@@ -189,6 +191,8 @@ def localize_quantiles_view(quantiles_df_view):
     def _row_label(idx):
         if idx == "Обеспеченность":
             return t("ensurance")
+        if idx == "Период повторяемости":
+            return t("return_period")
         if idx in (
             t("compound_label"),
             "Составная",
@@ -203,6 +207,76 @@ def localize_quantiles_view(quantiles_df_view):
 
     out.index = [_row_label(idx) for idx in out.index]
     return out
+
+
+def with_return_period_row(df_1):
+    """Добавляет столбец периода повторяемости (T=100/P) сразу после Обеспеченность."""
+    periods = [
+        curve_analysis_mod.format_return_period(p) for p in df_1["Обеспеченность"]
+    ]
+    out = df_1.copy()
+    if "Период повторяемости" in out.columns:
+        out["Период повторяемости"] = periods
+    else:
+        out.insert(1, "Период повторяемости", periods)
+    return out
+
+
+def linked_exceedance_inputs(key_prefix, default_p=20.0):
+    """
+    Два связанных поля: обеспеченность P и период повторяемости T=100/P.
+    Возвращает текущее P.
+    """
+    p_key = f"{key_prefix}_p"
+    t_key = f"{key_prefix}_t"
+    if p_key not in st.session_state:
+        st.session_state[p_key] = float(default_p)
+    if t_key not in st.session_state:
+        st.session_state[t_key] = 100.0 / float(st.session_state[p_key])
+
+    def _sync_from_p():
+        p = float(st.session_state[p_key])
+        p = min(max(p, 0.01), 99.99)
+        t_val = 100.0 / p
+        if t_val <= 1:
+            t_val = 1.001
+            p = 100.0 / t_val
+        elif t_val >= 10000:
+            t_val = 9999.0
+            p = 100.0 / t_val
+        st.session_state[p_key] = p
+        st.session_state[t_key] = t_val
+
+    def _sync_from_t():
+        t_val = float(st.session_state[t_key])
+        t_val = min(max(t_val, 1.001), 9999.999)
+        st.session_state[t_key] = t_val
+        st.session_state[p_key] = 100.0 / t_val
+
+    col_p, col_t = st.columns(2)
+    with col_p:
+        st.markdown(t("custom_p_extra"))
+        st.number_input(
+            t("custom_p_extra"),
+            min_value=0.01,
+            max_value=99.99,
+            format="%.3f",
+            key=p_key,
+            on_change=_sync_from_p,
+            label_visibility="collapsed",
+        )
+    with col_t:
+        st.markdown(t("custom_t_extra"))
+        st.number_input(
+            t("custom_t_extra"),
+            min_value=1.001,
+            max_value=9999.999,
+            format="%.3f",
+            key=t_key,
+            on_change=_sync_from_t,
+            label_visibility="collapsed",
+        )
+    return float(st.session_state[p_key])
 
 
 st.set_page_config(
@@ -674,6 +748,7 @@ with tab_process:
         st.info(t("process_need_prep"))
     else:
         try:
+            importlib.reload(curve_analysis_mod)
             from curve_analysis import (
                 PERCENT_LIST_DEFAULT,
                 apply_exceedance_axes,
@@ -1036,7 +1111,9 @@ with tab_process:
                 parameters_df_view = localize_parameters_view(
                     parameters_df.set_index("Распределение", drop=True).T
                 )
-                quantiles_df_view = localize_quantiles_view(df_1.T.copy())
+                quantiles_df_view = localize_quantiles_view(
+                    with_return_period_row(df_1).T.copy()
+                )
 
                 with st.expander(t("metrics_expander"), expanded=False):
                     st.markdown(
@@ -1054,14 +1131,7 @@ with tab_process:
                         quantiles_df_view.to_html(index=True, header=False),
                         unsafe_allow_html=True,
                     )
-                    p = st.number_input(
-                        t("custom_p_input"),
-                        min_value=0.001,
-                        max_value=99.999,
-                        value=20.0,
-                        format="%.3f",
-                        key="custom_p_simple",
-                    )
+                    p = linked_exceedance_inputs("custom_simple", default_p=20.0)
                     if (
                         "last_logged_p" not in st.session_state
                         or st.session_state.last_logged_p != p
@@ -1378,21 +1448,16 @@ with tab_process:
                     )
                 rows[t("compound_label")] = compound_vals
                 df_1 = pd.DataFrame(rows)
-                quantiles_df_view = localize_quantiles_view(df_1.T.copy())
+                quantiles_df_view = localize_quantiles_view(
+                    with_return_period_row(df_1).T.copy()
+                )
 
                 with st.expander(t("quantiles_expander"), expanded=False):
                     st.markdown(
                         quantiles_df_view.to_html(index=True, header=False),
                         unsafe_allow_html=True,
                     )
-                    p = st.number_input(
-                        t("custom_p_input"),
-                        min_value=0.001,
-                        max_value=99.999,
-                        value=20.0,
-                        format="%.3f",
-                        key="custom_p_compound",
-                    )
+                    p = linked_exceedance_inputs("custom_compound", default_p=20.0)
                     val = compound_ppf(p, cdf_funcs, ns, x_lo, x_hi)
                     custom_df = pd.DataFrame(
                         {

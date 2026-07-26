@@ -155,18 +155,41 @@ def fit_quality(data, values_col, selected_dist, params):
     return r2, mae, maxE, ad_stat
 
 
+def format_return_period(p_pct):
+    """T = 100 / P% для таблицы и подписей."""
+    t_years = 100.0 / float(p_pct)
+    if abs(t_years - round(t_years)) < 1e-9:
+        return str(int(round(t_years)))
+    if t_years >= 10:
+        return f"{t_years:.1f}"
+    return f"{t_years:.2f}".rstrip("0").rstrip(".")
+
+
 def apply_exceedance_axes(ax, values_col, title=None):
     ax.xaxis.grid(True)
     ax.set_xscale("function", functions=(scalefunc, lambda x: x))
     ax.set_xlabel(t("ensurance_pct"), fontsize=12)
     ax.set_ylabel(values_col, fontsize=12)
-    ax.set_title(title or t("curve_title"), fontsize=14)
+    ax.set_title(title or t("curve_title"), fontsize=14, pad=28)
     ax.set(xlim=(0.1, 99.9))
-    ticks = [0.1, 1, 2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
+    ticks = [0.1, 0.5, 1, 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 95, 98, 99, 99.9]
     ax.set_xticks(ticks)
     ax.set_xticklabels(ticks)
     ax.tick_params(axis="x", labelsize=11)
     ax.tick_params(axis="y", labelsize=11)
+
+    # Верхняя шкала: выбранные периоды (P = 100/T); без 40 и 25
+    # 0.5% (T=200) и 25% (T=4) уже в ticks снизу — сетка xaxis.grid их рисует как остальные
+    return_periods = [1000, 200, 100, 50, 20, 10, 5, 4, 2]
+    return_p = [100.0 / tr for tr in return_periods]
+    ax_top = ax.twiny()
+    ax_top.set_xscale("function", functions=(scalefunc, lambda x: x))
+    ax_top.set_xlim(ax.get_xlim())
+    ax_top.set_xticks(return_p)
+    ax_top.set_xticklabels([str(tr) for tr in return_periods])
+    ax_top.set_xlabel(t("return_period_years"), fontsize=12)
+    ax_top.tick_params(axis="x", labelsize=11)
+    return ax_top
 
 
 def fig_to_png_bytes(fig):
