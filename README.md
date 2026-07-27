@@ -36,12 +36,9 @@ Streamlit-приложение для подбора теоретических 
 
 <!-- START_ANALYTICS -->
 
-
 ![Динамика использований](graphs/daily_activity.png)
 
-
 ![Популярные распределения](graphs/distributions.png)
-
 
 ![Облако названий файлов](graphs/filename_wordcloud.png)
 
