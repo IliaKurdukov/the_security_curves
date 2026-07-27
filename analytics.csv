@@ -264,4 +264,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-07-27;09:12:45;ba33049b-a3e6-491a-9ecd-f5211756bc43;__old_url_stub__;0;None;[];0;[]
 2026-07-27;09:13:15;4e49c912-6e3b-4eb6-b0f7-fd42edb7c659;__old_url_stub__;0;None;[];0;[]
 2026-07-27;09:13:18;3a517e03-8f30-49cb-9ca8-baec4eaf6fcf;__old_url_stub__;0;None;[];0;[]
-2026-07-27;09:17:00;ac2df0d4-e845-41dc-8e92-7a6e39056608;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
+2026-07-27;09:17:02;ac2df0d4-e845-41dc-8e92-7a6e39056608;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
