@@ -233,6 +233,9 @@ def log_analytics(uploaded_file=None, distributions_selected=None, custom_ensure
 
             parts[0] = date_str
             parts[1] = time_str
+            # Актуальный файл сессии (тестовый ↔ свой), иначе график путает категории
+            parts[3] = uploaded_file.name
+            parts[4] = str(len(uploaded_file.getvalue()))
 
             if distributions_selected is not None:
                 parts[6] = format_list_for_csv(list(distributions_selected))

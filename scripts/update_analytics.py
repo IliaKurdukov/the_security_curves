@@ -36,7 +36,7 @@ GRAPHS_DIR = Path("graphs")
 ANALYTICS_LABELS = {
     "ru": {
         "daily_title": "Динамика количества использований по дням",
-        "daily_regular": "Обычные загрузки",
+        "daily_regular": "Свои данные (с кривой)",
         "daily_sample": "Тестовый файл",
         "daily_old_url": "Старый URL (заглушка)",
         "dist_title": "Самые распространенные распределения (кол-во использований)",
@@ -49,7 +49,7 @@ ANALYTICS_LABELS = {
     },
     "en": {
         "daily_title": "Daily usage over time",
-        "daily_regular": "Regular uploads",
+        "daily_regular": "Own data (with curve)",
         "daily_sample": "Sample file",
         "daily_old_url": "Old URL (stub)",
         "dist_title": "Most used distributions (usage count)",
@@ -217,6 +217,15 @@ def is_old_url_stub(filename):
     if filename is None or (isinstance(filename, float) and pd.isna(filename)):
         return False
     return Path(str(filename)).name == OLD_URL_STUB_NAME
+
+
+def has_built_curve(row):
+    """Сессия дошла до построения кривой (выбраны распределения)."""
+    try:
+        return int(row.get("distributions_count", 0) or 0) > 0
+    except (TypeError, ValueError):
+        dists = parse_distributions_list(str(row.get("distributions_selected", "") or ""))
+        return len(dists) > 0
 
 
 def _cyrillic_font_path():
@@ -442,6 +451,7 @@ def create_daily_activity_graph(df):
     recent = df[df["datetime"] >= cutoff_date_dt].copy()
     recent["_is_sample"] = recent["file_name"].apply(is_sample_file)
     recent["_is_stub"] = recent["file_name"].apply(is_old_url_stub)
+    recent["_built_curve"] = recent.apply(has_built_curve, axis=1)
 
     def counts_by_date(frame):
         if frame.empty:
@@ -453,11 +463,19 @@ def create_daily_activity_graph(df):
         merged = pd.merge(full_dates, daily, on="date", how="left").fillna(0)
         return merged.sort_values("date")
 
-    regular_counts = counts_by_date(
-        recent[~recent["_is_sample"] & ~recent["_is_stub"]]
-    )
-    sample_counts = counts_by_date(recent[recent["_is_sample"]])
+    # hidrodata: любой визит на заглушку
+    # app: тестовый файл отдельно; свои данные — только если построили кривую
     stub_counts = counts_by_date(recent[recent["_is_stub"]])
+    sample_counts = counts_by_date(
+        recent[recent["_is_sample"] & ~recent["_is_stub"]]
+    )
+    regular_counts = counts_by_date(
+        recent[
+            ~recent["_is_sample"]
+            & ~recent["_is_stub"]
+            & recent["_built_curve"]
+        ]
+    )
     x = np.arange(len(regular_counts["date"]))
     y_max = max(
         regular_counts["count"].max(),
