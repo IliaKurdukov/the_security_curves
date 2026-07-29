@@ -133,7 +133,7 @@ def parse_list_from_csv(csv_string):
 
 
 def log_stub_visit():
-    """Один раз за сессию: визит на заглушку старого URL → analytics.csv."""
+    """Один раз за сессию: клик «перейти на новое» на заглушке → analytics.csv."""
     try:
         if st.session_state.get("_stub_visit_logged"):
             return False

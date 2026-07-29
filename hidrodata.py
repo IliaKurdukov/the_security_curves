@@ -1,6 +1,9 @@
 """
 Заглушка для старого URL Streamlit Cloud.
 Главное приложение: app.py → https://exceedance-curves.streamlit.app/
+
+В analytics.csv пишем только клик по кнопке перехода на новый адрес
+(не простой заход на страницу и не авторедирект).
 """
 
 import streamlit as st
@@ -16,41 +19,35 @@ st.set_page_config(
     layout="centered",
 )
 
-# Учёт захода по старой ссылке (тот же analytics.csv, маркер __old_url_stub__)
-log_stub_visit()
-
 st.title("📉 Exceedance curves")
 st.subheader("Приложение переехало / The app has moved")
 
 st.markdown(
-    f"""
-Мы сменили адрес. Откройте актуальную версию здесь:
-
-**[{NEW_URL}]({NEW_URL})**
+    """
+Мы сменили адрес. Нажмите кнопку ниже, чтобы открыть актуальную версию.
 
 ---
 
-This app has moved to a new address:
-
-**[{NEW_URL}]({NEW_URL})**
+This app has moved. Click the button below to open the current version.
 """
 )
 
-st.link_button("Открыть новое приложение / Open new app", NEW_URL, type="primary")
+if st.button(
+    "Открыть новое приложение / Open new app",
+    type="primary",
+    use_container_width=True,
+):
+    # Считаем только осознанный переход по кнопке
+    log_stub_visit()
+    st.session_state["_stub_redirect"] = True
 
-st.caption("Через несколько секунд страница попытается перейти автоматически.")
-
-# Клиентский редирект (не HTTP 301, но удобно для закладок)
-components.html(
-    f"""
-    <script>
-    setTimeout(function () {{
-      window.top.location.href = "{NEW_URL}";
-    }}, 4000);
-    </script>
-    <p style="font-family: sans-serif; color: #666; font-size: 0.9rem;">
-      Redirecting in 4 seconds…
-    </p>
-    """,
-    height=40,
-)
+if st.session_state.get("_stub_redirect"):
+    st.info("Переход… / Redirecting…")
+    components.html(
+        f"""
+        <script>
+        window.top.location.href = "{NEW_URL}";
+        </script>
+        """,
+        height=0,
+    )
