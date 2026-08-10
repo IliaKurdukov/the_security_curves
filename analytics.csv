@@ -345,4 +345,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-08-07;07:00:36;4cf5b7d9-d113-42a9-8df1-36ae0b1bac9b;tsc_sample__daily_precip.xlsx;347337;None;[Обобщенное (L-мом)];1;[20.0]
 2026-08-07;09:41:02;fab67298-3480-418a-9aa7-b4d427b5392f;Расходы.xls;31744;89;[Пирсона 3 типа (ММП), Гумбеля (L-мом), Пирсона 3 типа (L-мом)];3;[20.0]
 2026-08-07;16:29:19;12512793-1181-4275-8151-343b03eeeb99;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
-2026-08-10;08:13:21;e1db78a0-42f4-47eb-9bf7-7c4ece0b51d1;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом), Пирсона 3 типа (ММП)];2;[20.0]
+2026-08-10;08:13:32;e1db78a0-42f4-47eb-9bf7-7c4ece0b51d1;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом), Пирсона 3 типа (ММП)];2;[20.0]
