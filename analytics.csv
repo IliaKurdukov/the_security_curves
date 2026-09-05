@@ -403,4 +403,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-09-03;19:20:49;d2186ad7-2f66-405e-99ee-6f3108bf4f08;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
 2026-09-04;11:24:05;6cd9af84-ca0f-41ae-945c-5999d3e9b53c;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
 2026-09-04;19:20:24;fb0f0660-327e-4fbf-980a-759eb1d457b9;расчет толщины.xlsx;16959;43;[Пирсона 3 типа (ММП)];1;[20.0, 0.010001000100010001]
-2026-09-05;14:08:48;cfbd6432-4907-47d4-bf2d-a27f319e0896;max_prec.xlsx;11865;None;[];0;[]
+2026-09-05;14:08:48;cfbd6432-4907-47d4-bf2d-a27f319e0896;max_prec.xlsx;11865;131;[];0;[]
