@@ -474,4 +474,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-10-01;05:37:42;cc251622-e159-4903-a3dc-929dd9f454c2;__old_url_stub__;0;None;[];0;[]
 2026-10-01;06:01:25;9e3f325f-3dd8-41ff-ac26-d39d6574c5e7;__old_url_stub__;0;None;[];0;[]
 2026-10-02;06:05:07;b8845790-1621-45d3-a43e-cac14920d9e4;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом), Гумбеля (ММП)];2;[20.0]
-2026-10-04;06:18:21;1f8e483e-f653-4fbd-b5fc-b007a29fa591;max_prec.xlsx;10952;51;[Гумбеля (L-мом)];1;[20.0]
+2026-10-04;06:18:54;1f8e483e-f653-4fbd-b5fc-b007a29fa591;max_prec.xlsx;10952;51;[Гумбеля (L-мом)];1;[20.0]
