@@ -478,3 +478,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-10-05;02:29:50;aad7ddff-dd70-4d5d-93bd-d33f78c0a43f;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
 2026-10-06;15:30:10;0fabe055-affe-44e0-bebb-a85ddf03f2fd;Чус городки.xlsx;9621;70;[Пирсона 3 типа (ММП), Обобщенное (ММП), Обобщенное (L-мом), Крицкого-Менкеля (ММП)];4;[20.0]
 2026-10-06;15:32:57;5cb627dd-8b4c-49e4-8010-4a003c63fcbe;Чус городки.xlsx;9621;70;[Пирсона 3 типа (L-мом), Крицкого-Менкеля (ММП)];2;[20.0]
+2026-10-07;13:48:58;716b7a3f-ba62-4ed1-ace9-69456af8a624;tsc_sample__daily_precip.xlsx;347337;None;[];0;[]
