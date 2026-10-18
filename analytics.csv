@@ -498,4 +498,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-10-18;07:21:09;343ba11a-d893-484e-bb9e-a072a140c7e0;__old_url_stub__;0;None;[];0;[]
 2026-10-18;07:24:46;ffa9f6c8-edaf-42ad-91c3-a13b71906bc2;__old_url_stub__;0;None;[];0;[]
 2026-10-18;07:28:42;444c9316-1bdb-4d31-8eee-0e74ae934fe0;Ветер.xlsx;8812;58;[];0;[]
-2026-10-18;07:29:59;3d0548f1-50fa-461f-a7cd-8c9ec024ccdd;Ветер.xlsx;9523;59;[];0;[]
+2026-10-18;07:30:02;3d0548f1-50fa-461f-a7cd-8c9ec024ccdd;Ветер.xlsx;9523;59;[Обобщенное (L-мом)];1;[]
