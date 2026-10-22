@@ -514,3 +514,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-10-22;14:01:18;8ef9f153-53db-49fb-9a4a-55e3008b3aa1;Ряд.xlsx;10519;112;[Пирсона 3 типа (L-мом)];1;[20.0]
 2026-10-22;19:07:09;adbbc1e7-ee30-45b8-9343-be40bc750c7d;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
 2026-10-22;19:42:11;789a8b2d-1597-4ab0-8ef2-2130aac4fae4;ntcn2.xlsx;16599;366;[Пирсона 3 типа (ММП), Пирсона 3 типа (L-мом)];2;[20.0]
+2026-10-22;20:17:13;b946c5ca-c426-42c3-b967-3ba8596419bb;тест1.xlsx;16337;None;[];0;[]
