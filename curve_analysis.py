@@ -57,7 +57,11 @@ def teor_x_grid():
 
 
 def scalefunc(x):
-    return stats.norm.ppf(x / 100, loc=0, scale=1)
+    return stats.norm.ppf(np.asarray(x, dtype=float) / 100.0, loc=0, scale=1)
+
+
+def inv_scalefunc(x):
+    return stats.norm.cdf(np.asarray(x, dtype=float), loc=0, scale=1) * 100.0
 
 
 def build_empirical(series_df, values_col, index_col):
@@ -167,7 +171,7 @@ def format_return_period(p_pct):
 
 def apply_exceedance_axes(ax, values_col, title=None):
     ax.xaxis.grid(True)
-    ax.set_xscale("function", functions=(scalefunc, lambda x: x))
+    ax.set_xscale("function", functions=(scalefunc, inv_scalefunc))
     ax.set_xlabel(t("ensurance_pct"), fontsize=12)
     ax.set_ylabel(values_col, fontsize=12)
     ax.set_title(title or t("curve_title"), fontsize=14, pad=28)
@@ -183,7 +187,7 @@ def apply_exceedance_axes(ax, values_col, title=None):
     return_periods = [1000, 200, 100, 50, 20, 10, 5, 4, 2]
     return_p = [100.0 / tr for tr in return_periods]
     ax_top = ax.twiny()
-    ax_top.set_xscale("function", functions=(scalefunc, lambda x: x))
+    ax_top.set_xscale("function", functions=(scalefunc, inv_scalefunc))
     ax_top.set_xlim(ax.get_xlim())
     ax_top.set_xticks(return_p)
     ax_top.set_xticklabels([str(tr) for tr in return_periods])

@@ -1,10 +1,14 @@
 """Точка входа Streamlit: UI кривых обеспеченности."""
 
+import base64
 import importlib
 import math
 from io import BytesIO
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -42,10 +46,17 @@ init_language_widgets = i18n_mod.init_language_widgets
 pluralize_rows = i18n_mod.pluralize_rows
 t = i18n_mod.t
 
+
+def show_png_bytes(png: bytes, *, width="stretch"):
+    """Показ PNG через data URI — обход MediaFileManager (на Cloud иначе «0»)."""
+    b64 = base64.b64encode(png).decode("ascii")
+    st.image(f"data:image/png;base64,{b64}", width=width)
+
+
 def show_matplotlib_fig(fig, *, width="stretch"):
-    """PNG + st.image: на Streamlit Cloud st.pyplot часто показывает битую картинку «0»."""
+    """Сохранить figure в PNG и показать без /media/... HTTP."""
     png = curve_analysis_mod.fig_to_png_bytes(fig)
-    st.image(png, width=width)
+    show_png_bytes(png, width=width)
     return png
 
 
@@ -1554,7 +1565,7 @@ with tab_results:
 
             if process_ok and results_curve_png is not None:
                 with st.expander(t("curves_expander"), expanded=False):
-                    st.image(results_curve_png, width="stretch")
+                    show_png_bytes(results_curve_png)
 
             if process_ok and results_parameters_df is not None:
                 with st.expander(t("metrics_expander"), expanded=False):
