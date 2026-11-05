@@ -48,9 +48,17 @@ t = i18n_mod.t
 
 
 def show_png_bytes(png: bytes, *, width="stretch"):
-    """Показ PNG через data URI — обход MediaFileManager (на Cloud иначе «0»)."""
+    """Показ PNG через HTML data URI — без Streamlit /media/ (иначе на Cloud «0»)."""
     b64 = base64.b64encode(png).decode("ascii")
-    st.image(f"data:image/png;base64,{b64}", width=width)
+    style = (
+        "width:100%;height:auto;display:block;"
+        if width == "stretch"
+        else "max-width:100%;height:auto;display:block;"
+    )
+    st.markdown(
+        f'<img src="data:image/png;base64,{b64}" style="{style}" alt="chart"/>',
+        unsafe_allow_html=True,
+    )
 
 
 def show_matplotlib_fig(fig, *, width="stretch"):
