@@ -42,6 +42,13 @@ init_language_widgets = i18n_mod.init_language_widgets
 pluralize_rows = i18n_mod.pluralize_rows
 t = i18n_mod.t
 
+def show_matplotlib_fig(fig, *, width="stretch"):
+    """PNG + st.image: на Streamlit Cloud st.pyplot часто показывает битую картинку «0»."""
+    png = curve_analysis_mod.fig_to_png_bytes(fig)
+    st.image(png, width=width)
+    return png
+
+
 SAMPLE_DATA_PATH = (
     Path(__file__).resolve().parent / "examples" / "tsc_sample__daily_precip.xlsx"
 )
@@ -756,7 +763,6 @@ with tab_process:
                 compound_ppf,
                 distribution_moments,
                 empirical_column_metrics,
-                fig_to_png_bytes,
                 fit_quality,
                 make_cdf_func,
                 teor_x_grid,
@@ -1002,8 +1008,7 @@ with tab_process:
                     )
                     ax_p.set_ylabel(values_col)
                     ax_p.legend()
-                    st.pyplot(fig_p, width="content")
-                    plt.close(fig_p)
+                    show_matplotlib_fig(fig_p)
 
                 if len(seg1) < 3:
                     st.error(t("segment_too_small", i=1))
@@ -1105,8 +1110,7 @@ with tab_process:
 
                 apply_exceedance_axes(ax, values_col)
                 ax.legend(title=t("legend_dist"), fontsize=11, title_fontsize=12)
-                st.pyplot(fig, width="content")
-                results_curve_png = fig_to_png_bytes(fig)
+                results_curve_png = show_matplotlib_fig(fig)
 
                 parameters_df_view = localize_parameters_view(
                     parameters_df.set_index("Распределение", drop=True).T
@@ -1243,8 +1247,7 @@ with tab_process:
                     )
                     apply_exceedance_axes(ax_i, values_col)
                     ax_i.legend(title=t("legend_dist"), fontsize=11, title_fontsize=12)
-                    st.pyplot(fig_i, width="content")
-                    plt.close(fig_i)
+                    show_matplotlib_fig(fig_i)
 
                     r2, mae, maxE, ad_stat = fit_quality(
                         data_i, values_col, selected_dist, params
@@ -1367,8 +1370,7 @@ with tab_process:
                     pad = 0.05 * max(y1 - y0, 1e-9)
                     ax_c.set_ylim(y0 - pad, y1 + pad)
                 ax_c.legend(title=t("legend_dist"), fontsize=11, title_fontsize=12)
-                st.pyplot(fig_c, width="content")
-                results_curve_png = fig_to_png_bytes(fig_c)
+                results_curve_png = show_matplotlib_fig(fig_c)
 
                 # compound metrics vs empirical full series
                 predict_c = []
@@ -1548,12 +1550,11 @@ with tab_results:
                 ax.tick_params(axis="y", labelsize=11)
                 if index_col != NO_GROUP:
                     ax.set_xlabel(index_col, fontsize=12)
-                st.pyplot(fig, width="content")
-                plt.close(fig)
+                show_matplotlib_fig(fig)
 
             if process_ok and results_curve_png is not None:
                 with st.expander(t("curves_expander"), expanded=False):
-                    st.image(results_curve_png, use_container_width=True)
+                    st.image(results_curve_png, width="stretch")
 
             if process_ok and results_parameters_df is not None:
                 with st.expander(t("metrics_expander"), expanded=False):
