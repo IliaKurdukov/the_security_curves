@@ -593,3 +593,4 @@ date;time;session_id;file_name;file_size;file_rows;distributions_selected;distri
 2026-11-05;10:34:18;4f9b7591-515d-4276-af37-8fc97f7ef540;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
 2026-11-05;10:46:55;603c695a-2239-4c85-8964-d470330ff143;tsc_sample__daily_precip.xlsx;347337;21184;[Обобщенное (L-мом)];1;[20.0]
 2026-11-05;10:51:44;e32d2811-5aef-4db1-aa9f-14c6e89f792c;Иртыш-пос.Сибирский (уровни).xlsx;11165;40;[Крицкого-Менкеля (ММП)];1;[20.0]
+2026-11-05;11:12:04;e43567ed-2c52-477d-9d23-e1c911187025;tsc_sample__daily_precip.xlsx;347337;None;[];0;[]
