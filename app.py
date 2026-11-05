@@ -3,7 +3,6 @@
 import base64
 import importlib
 import math
-import struct
 from io import BytesIO
 from pathlib import Path
 
@@ -16,7 +15,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import scipy.stats as stats
 import streamlit as st
-import streamlit.components.v1 as components
 from sklearn.metrics import mean_absolute_error, max_error, r2_score
 
 import i18n as i18n_mod
@@ -49,35 +47,14 @@ pluralize_rows = i18n_mod.pluralize_rows
 t = i18n_mod.t
 
 
-def _png_pixel_size(png: bytes):
-    """Ширина/высота PNG из IHDR (без Pillow)."""
-    if len(png) < 24 or png[:8] != b"\x89PNG\r\n\x1a\n":
-        return 1200, 600
-    return struct.unpack(">II", png[16:24])
-
-
 def show_png_bytes(png: bytes, *, width="stretch"):
-    """Показ PNG через components.html + data URI (обход /media/ на Cloud)."""
-    del width  # всегда растягиваем на ширину контейнера iframe
+    """st.image + data URI: нативный fullscreen Streamlit, без /media/ на Cloud."""
     b64 = base64.b64encode(png).decode("ascii")
-    pw, ph = _png_pixel_size(png)
-    # ориентир ширины колонки Streamlit ~700px
-    display_h = max(280, min(900, int(ph * 700 / max(pw, 1)) + 16))
-    components.html(
-        f"""
-        <div style="width:100%;margin:0;padding:0;">
-          <img src="data:image/png;base64,{b64}"
-               style="width:100%;height:auto;display:block;"
-               alt="chart"/>
-        </div>
-        """,
-        height=display_h,
-        scrolling=False,
-    )
+    st.image(f"data:image/png;base64,{b64}", width=width)
 
 
 def show_matplotlib_fig(fig, *, width="stretch"):
-    """Сохранить figure в PNG и показать без /media/... HTTP."""
+    """PNG → st.image (data URI)."""
     png = curve_analysis_mod.fig_to_png_bytes(fig)
     show_png_bytes(png, width=width)
     return png

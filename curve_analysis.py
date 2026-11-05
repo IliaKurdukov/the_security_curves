@@ -198,7 +198,7 @@ def apply_exceedance_axes(ax, values_col, title=None):
 
 def fig_to_png_bytes(fig):
     buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight", pad_inches=0.3)
     plt.close(fig)
     buf.seek(0)
     return buf.getvalue()
