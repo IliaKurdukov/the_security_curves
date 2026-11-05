@@ -49,7 +49,7 @@ pluralize_rows = i18n_mod.pluralize_rows
 t = i18n_mod.t
 
 
-def _png_pixel_size(png: bytes) -> tuple[int, int]:
+def _png_pixel_size(png: bytes):
     """Ширина/высота PNG из IHDR (без Pillow)."""
     if len(png) < 24 or png[:8] != b"\x89PNG\r\n\x1a\n":
         return 1200, 600
